@@ -1,0 +1,9 @@
+node_modules
+.env
+dist
+coverage
+*.log
+# Phase 2 closure depends on the raw evidence logs; keep them tracked while
+# still ignoring arbitrary application logs everywhere else.
+!docs/evidence/phase2-exam-document/*.log
+prisma/migrations/dev.db

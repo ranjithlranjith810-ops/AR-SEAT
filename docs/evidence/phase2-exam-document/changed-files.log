@@ -1,0 +1,65 @@
+﻿CHANGED-FILES / WORKING-TREE INVENTORY (final state)
+Repository: branch 'main', NO COMMITS YET (unborn branch) -> every file is untracked;
+git diff --stat is empty (0 bytes) because there is no tracked baseline.
+Scope in an unborn repo is therefore proven by inventory, not by git diff.
+
+=== Phase 2 evidence artifacts (created by this evidence task) ===
+docs/evidence/phase2-exam-document/changed-files.log
+docs/evidence/phase2-exam-document/dedup-migration.log
+docs/evidence/phase2-exam-document/env-audit.log
+docs/evidence/phase2-exam-document/evidence-manifest.md
+docs/evidence/phase2-exam-document/git-diff-stat.log
+docs/evidence/phase2-exam-document/git-status.log
+docs/evidence/phase2-exam-document/integration-run.log
+docs/evidence/phase2-exam-document/missing-credentials.log
+docs/evidence/phase2-exam-document/normal-run.log
+docs/evidence/phase2-exam-document/prisma-validate.log
+docs/evidence/phase2-exam-document/README.md
+docs/evidence/phase2-exam-document/storage-integration-list.log
+docs/evidence/phase2-exam-document/tsc.log
+
+=== Phase 2 implementation scope ===
+src/services/exam-document/document.service.ts
+src/services/exam-document/extract.ts
+src/services/exam-document/extractorConfig.ts
+src/services/exam-document/ingest.ts
+src/services/exam-document/normalize.ts
+src/services/exam-document/pdf.ts
+src/services/exam-document/storage-integration.ts
+src/services/exam-document/types.ts
+src/services/exam-document/upload.ts
+src/services/exam-document/validate.ts
+
+=== Phase 2 test scope ===
+tests/candidate.test.ts
+tests/class.test.ts
+tests/deletion.test.ts
+tests/department.test.ts
+tests/exam-document.test.ts
+tests/fixture-pdf.ts
+tests/fixtures.ts
+tests/hall.test.ts
+tests/helpers.ts
+tests/seat-assignment.test.ts
+tests/seating-plan.test.ts
+tests/setup.ts
+tests/snapshot.test.ts
+tests/solve-job.test.ts
+tests/storage-integration-gate.test.ts
+tests/storage-integration.test.ts
+tests/student.test.ts
+
+=== Phase 2 dedup migration (unchanged, scope confirmed) ===
+prisma/migrations/20260813090000_exam_doc_dedup/migration.sql
+
+=== config/tooling part of Phase 2 final state ===
+.env.example
+.gitignore
+package.json
+vitest.config.ts
+
+=== note ===
+All other top-level entries (prisma/, scripts/, src/ apart from exam-document, tsconfig.json,
+package-lock.json) are the pre-existing Phase 1 foundation and tooling; NOT modified by this
+evidence task. Out-of-scope scan: no CP-SAT/FastAPI/SchoolOS/EA-System artifacts (the only
+'CP-SAT' string is an asserted error message in the pre-existing Phase 1 tests/solve-job.test.ts).

@@ -1,0 +1,5 @@
+﻿ENV AUDIT: integration flag persistence check
+Target file: .env (secret values redacted; never printed)
+-----------------------------------------------------
+STORAGE_INTEGRATION_ENABLED_1: NO
+STORAGE_INTEGRATION_PRESENT: NO

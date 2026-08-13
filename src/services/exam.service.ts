@@ -1,0 +1,63 @@
+import { ExamSession, ExamStatus, ExamType } from "@prisma/client";
+import { prisma } from "../db";
+import { SeatingError } from "../errors";
+import { logAudit } from "./audit.service";
+
+const ALLOWED_TRANSITIONS: Record<ExamStatus, ExamStatus[]> = {
+  DRAFT: ["READY", "CANCELLED"],
+  READY: ["GENERATING", "CANCELLED"],
+  GENERATING: ["GENERATED", "CANCELLED"],
+  GENERATED: ["APPROVED", "CANCELLED"],
+  APPROVED: ["PUBLISHED", "CANCELLED"],
+  PUBLISHED: [],
+  CANCELLED: [],
+};
+
+export interface CreateExamInput {
+  examDate: Date;
+  session: ExamSession;
+  examType?: ExamType;
+}
+
+export function assertExamTransition(from: ExamStatus, to: ExamStatus): void {
+  if (!ALLOWED_TRANSITIONS[from].includes(to)) {
+    throw new SeatingError(
+      `Invalid exam status transition: ${from} -> ${to}`,
+      "INVALID_EXAM_STATUS_TRANSITION",
+    );
+  }
+}
+
+export async function createExam(input: CreateExamInput, actorId?: string) {
+  const exam = await prisma.exam.create({
+    data: {
+      examDate: input.examDate,
+      session: input.session,
+      examType: input.examType ?? "UNIVERSITY",
+      status: "DRAFT",
+    },
+  });
+  await logAudit({
+    action: "EXAM_CREATED",
+    entityType: "Exam",
+    entityId: exam.id,
+    actorId,
+  });
+  return exam;
+}
+
+export async function getExam(id: string) {
+  const exam = await prisma.exam.findUnique({ where: { id } });
+  if (!exam) throw new SeatingError("Exam not found", "EXAM_NOT_FOUND");
+  return exam;
+}
+
+export async function transitionExamStatus(
+  id: string,
+  to: ExamStatus,
+  actorId?: string,
+) {
+  const exam = await getExam(id);
+  assertExamTransition(exam.status, to);
+  return prisma.exam.update({ where: { id }, data: { status: to } });
+}

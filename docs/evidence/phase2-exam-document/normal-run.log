@@ -1,0 +1,110 @@
+
+> ar-seat-prototype@0.1.0 test
+> node scripts/run-tests.mjs
+
+
+=== Test database: /exam_seating_test ===
+
+Test database "exam_seating_test" already exists.
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "exam_seating_test", schema "public" at "aws-0-ap-south-1.pooler.supabase.com:5432"
+
+2 migrations found in prisma/migrations
+
+
+No pending migrations to apply.
+Seed complete.
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mD:/Startup/prototype/AR-SEAT[39m
+
+ [32m✓[39m tests/solve-job.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 64896[2mms[22m[39m
+   [33m[2m✓[22m[39m SolveJob[2m > [22mcan be queued [33m 5633[2mms[22m[39m
+   [33m[2m✓[22m[39m SolveJob[2m > [22mtransitions a queued job into RUNNING [33m 4298[2mms[22m[39m
+   [33m[2m✓[22m[39m SolveJob[2m > [22mtransitions a running job into SUCCEEDED with an OPTIMAL result [33m 4508[2mms[22m[39m
+   [33m[2m✓[22m[39m SolveJob[2m > [22mstores a FEASIBLE solver result when optimality is not proven [33m 4298[2mms[22m[39m
+   [33m[2m✓[22m[39m SolveJob[2m > [22mrecords an INFEASIBLE result with a business reason instead of a server error [33m 4506[2mms[22m[39m
+   [33m[2m✓[22m[39m SolveJob[2m > [22mstores an error code and message on FAILED [33m 4405[2mms[22m[39m
+   [33m[2m✓[22m[39m SolveJob[2m > [22mrejects a duplicate active job for the same exam [33m 4014[2mms[22m[39m
+   [33m[2m✓[22m[39m SolveJob[2m > [22mallows independent jobs for different exams [33m 2131[2mms[22m[39m
+   [33m[2m✓[22m[39m SolveJob[2m > [22mrefuses a heartbeat from a non-running job [33m 3889[2mms[22m[39m
+   [33m[2m✓[22m[39m SolveJob[2m > [22mcan be cancelled from QUEUED [33m 4099[2mms[22m[39m
+   [33m[2m✓[22m[39m SolveJob[2m > [22mdetects a stale heartbeat and reaps the job to FAILED with WORKER_TIMEOUT [33m 4692[2mms[22m[39m
+   [33m[2m✓[22m[39m SolveJob[2m > [22mdoes not reap a job with a fresh heartbeat [33m 4417[2mms[22m[39m
+   [33m[2m✓[22m[39m SolveJob[2m > [22mallows a new solve after the previous one reached a terminal state [33m 5068[2mms[22m[39m
+ [32m✓[39m tests/deletion.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 24593[2mms[22m[39m
+   [33m[2m✓[22m[39m No hard delete policy[2m > [22mrefuses to hard-delete an operational exam [33m 3396[2mms[22m[39m
+   [33m[2m✓[22m[39m No hard delete policy[2m > [22mrefuses to hard-delete an operational candidate [33m 1661[2mms[22m[39m
+   [33m[2m✓[22m[39m No hard delete policy[2m > [22mrefuses to hard-delete a seating plan [33m 2212[2mms[22m[39m
+   [33m[2m✓[22m[39m No hard delete policy[2m > [22mrefuses to hard-delete a seat assignment [33m 2561[2mms[22m[39m
+   [33m[2m✓[22m[39m No hard delete policy[2m > [22mrefuses to hard-delete an uploaded operational document [33m 2662[2mms[22m[39m
+   [33m[2m✓[22m[39m No hard delete policy[2m > [22mpreserves a student record once examination history exists [33m 2386[2mms[22m[39m
+   [33m[2m✓[22m[39m No hard delete policy[2m > [22mstill allows deleting a student with no examination history [33m 687[2mms[22m[39m
+   [33m[2m✓[22m[39m No hard delete policy[2m > [22muses lifecycle status instead of deletion for exams [33m 522[2mms[22m[39m
+ [32m✓[39m tests/seat-assignment.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 26149[2mms[22m[39m
+   [33m[2m✓[22m[39m SeatAssignment[2m > [22mlets a candidate receive a seat inside a plan [33m 5018[2mms[22m[39m
+   [33m[2m✓[22m[39m SeatAssignment[2m > [22mprevents the same candidate receiving two seats in the same plan [33m 3202[2mms[22m[39m
+   [33m[2m✓[22m[39m SeatAssignment[2m > [22mprevents two candidates occupying the same seat in the same plan [33m 3248[2mms[22m[39m
+   [33m[2m✓[22m[39m SeatAssignment[2m > [22mrejects assigning a candidate from a different exam to the plan [33m 3687[2mms[22m[39m
+   [33m[2m✓[22m[39m SeatAssignment[2m > [22mpreserves exact historical seat placement after a plan is published [33m 3172[2mms[22m[39m
+ [32m✓[39m tests/candidate.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 25200[2mms[22m[39m
+   [33m[2m✓[22m[39m ExamCandidate[2m > [22mreferences an existing student and exam through real foreign keys [33m 2579[2mms[22m[39m
+   [33m[2m✓[22m[39m ExamCandidate[2m > [22mpopulates snapshot fields from the student master at candidate creation [33m 1048[2mms[22m[39m
+   [33m[2m✓[22m[39m ExamCandidate[2m > [22mcan override the register number snapshot independently of the master record [33m 999[2mms[22m[39m
+   [33m[2m✓[22m[39m ExamCandidate[2m > [22mrejects a duplicate register number within the same exam [33m 1584[2mms[22m[39m
+   [33m[2m✓[22m[39m ExamCandidate[2m > [22mrejects the same student twice within the same exam even with a different register number [33m 1490[2mms[22m[39m
+   [33m[2m✓[22m[39m ExamCandidate[2m > [22mallows the same student to participate in different exams [33m 2045[2mms[22m[39m
+   [33m[2m✓[22m[39m ExamCandidate[2m > [22mallows subjects within the same exam to differ per candidate [33m 1843[2mms[22m[39m
+   [33m[2m✓[22m[39m ExamCandidate[2m > [22msolver gate[2m > [22monly VALIDATED candidates enter the solver input [33m 4915[2mms[22m[39m
+   [33m[2m✓[22m[39m ExamCandidate[2m > [22msolver gate[2m > [22mrejects invalid validation status transitions [33m 1126[2mms[22m[39m
+ [32m✓[39m tests/seating-plan.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 23523[2mms[22m[39m
+   [33m[2m✓[22m[39m SeatingPlan[2m > [22massigns an automatically incrementing version per exam [33m 2355[2mms[22m[39m
+   [33m[2m✓[22m[39m SeatingPlan[2m > [22mkeeps every historical version available instead of overwriting [33m 1637[2mms[22m[39m
+   [33m[2m✓[22m[39m SeatingPlan[2m > [22msupersedes the previous plan and links via supersedesPlanId [33m 1331[2mms[22m[39m
+   [33m[2m✓[22m[39m SeatingPlan[2m > [22mmoves a plan through DRAFT -> APPROVED -> PUBLISHED [33m 1637[2mms[22m[39m
+   [33m[2m✓[22m[39m SeatingPlan[2m > [22menforces a unique (examId, version) combination [33m 953[2mms[22m[39m
+   [33m[2m✓[22m[39m SeatingPlan[2m > [22mallows only one PUBLISHED plan per exam [33m 2325[2mms[22m[39m
+   [33m[2m✓[22m[39m SeatingPlan[2m > [22mpublishing supersedes any other PUBLISHED plan for the same exam [33m 3378[2mms[22m[39m
+   [33m[2m✓[22m[39m SeatingPlan[2m > [22mrejects approving or publishing a SUPERSEDED plan [33m 1433[2mms[22m[39m
+ [32m✓[39m tests/exam-document.test.ts [2m([22m[2m16 tests[22m[2m)[22m[33m 24698[2mms[22m[39m
+   [33m[2m✓[22m[39m ingest pipeline (E2E, memory store)[2m > [22mruns full upload -> parse -> validate -> candidate persist [33m 4302[2mms[22m[39m
+   [33m[2m✓[22m[39m ingest pipeline (E2E, memory store)[2m > [22mflags unknown registers as NEEDS_REVIEW and persists only matches [33m 1843[2mms[22m[39m
+   [33m[2m✓[22m[39m document deduplication (examId + fileHash)[2m > [22mfirst upload is created [33m 2965[2mms[22m[39m
+   [33m[2m✓[22m[39m document deduplication (examId + fileHash)[2m > [22ma different PDF for the same exam is allowed [33m 1638[2mms[22m[39m
+   [33m[2m✓[22m[39m document deduplication (examId + fileHash)[2m > [22mthe same PDF uploaded for a different exam is allowed (case B) [33m 2048[2mms[22m[39m
+ [32m✓[39m tests/snapshot.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 20234[2mms[22m[39m
+   [33m[2m✓[22m[39m Snapshot immutability[2m > [22mdoes not change the candidate snapshot when student master data changes [33m 2356[2mms[22m[39m
+   [33m[2m✓[22m[39m Snapshot immutability[2m > [22mrejects snapshot edits for a candidate in a PUBLISHED plan (application layer) [33m 4403[2mms[22m[39m
+   [33m[2m✓[22m[39m Snapshot immutability[2m > [22mrejects snapshot edits for a candidate in a PUBLISHED plan (database trigger) [33m 3139[2mms[22m[39m
+   [33m[2m✓[22m[39m Snapshot immutability[2m > [22mstill allows snapshot edits while the plan is only a DRAFT [33m 1877[2mms[22m[39m
+ [32m✓[39m tests/hall.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 12855[2mms[22m[39m
+   [33m[2m✓[22m[39m Hall[2m > [22mcan be created with configurable dimensions [33m 466[2mms[22m[39m
+   [33m[2m✓[22m[39m Hall[2m > [22mcreates seats matching rows x columns and does not store capacity [33m 430[2mms[22m[39m
+   [33m[2m✓[22m[39m Hall[2m > [22mrejects a duplicate seat position within a hall [33m 525[2mms[22m[39m
+   [33m[2m✓[22m[39m Hall[2m > [22mderives capacity from active HallSeat records [33m 497[2mms[22m[39m
+   [33m[2m✓[22m[39m Hall[2m > [22mexcludes inactive seats from capacity [33m 1253[2mms[22m[39m
+   [33m[2m✓[22m[39m Hall[2m > [22mprovides active seats used by the solver input builder [33m 819[2mms[22m[39m
+ [2m[90m↓[39m[22m tests/storage-integration.test.ts [2m([22m[2m3 tests[22m[2m | [22m[33m3 skipped[39m[2m)[22m
+ [32m✓[39m tests/student.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 11104[2mms[22m[39m
+   [33m[2m✓[22m[39m Student[2m > [22mcan be created [33m 615[2mms[22m[39m
+   [33m[2m✓[22m[39m Student[2m > [22menforces a unique register number [33m 439[2mms[22m[39m
+   [33m[2m✓[22m[39m Student[2m > [22mkeeps an inactive student in the database [33m 707[2mms[22m[39m
+   [33m[2m✓[22m[39m Student[2m > [22mremains available even after being transferred [33m 519[2mms[22m[39m
+ [32m✓[39m tests/storage-integration-gate.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 8980[2mms[22m[39m
+ [32m✓[39m tests/class.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 10910[2mms[22m[39m
+   [33m[2m✓[22m[39m Class[2m > [22mbelongs to a department [33m 1023[2mms[22m[39m
+   [33m[2m✓[22m[39m Class[2m > [22mrejects a duplicate class definition for the same department/name/academic year [33m 377[2mms[22m[39m
+   [33m[2m✓[22m[39m Class[2m > [22mcan hold students through the seeded hierarchy [33m 512[2mms[22m[39m
+ [32m✓[39m tests/department.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 8036[2mms[22m[39m
+   [33m[2m✓[22m[39m Department[2m > [22mrejects a duplicate department code [33m 510[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m12 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (13)[39m
+[2m      Tests [22m [1m[32m85 passed[39m[22m[2m | [22m[33m3 skipped[39m[90m (88)[39m
+[2m   Start at [22m 07:54:53
+[2m   Duration [22m 268.00s[2m (transform 332ms, setup 951ms, collect 1.88s, tests 261.18s, environment 3ms, prepare 1.39s)[22m
+
+
+All database integrity tests passed against the isolated test database.

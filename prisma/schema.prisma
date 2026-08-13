@@ -1,0 +1,340 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum StudentStatus {
+  ACTIVE
+  INACTIVE
+  PASSED_OUT
+  TRANSFERRED
+}
+
+enum ExamSession {
+  FN
+  AN
+}
+
+enum ExamType {
+  UNIVERSITY
+  INTERNAL
+  MODEL
+}
+
+enum ExamStatus {
+  DRAFT
+  READY
+  GENERATING
+  GENERATED
+  APPROVED
+  PUBLISHED
+  CANCELLED
+}
+
+enum CandidateValidationStatus {
+  UNVERIFIED
+  MATCHED
+  VALIDATED
+  REJECTED
+}
+
+enum DocumentParseStatus {
+  UPLOADED
+  PROCESSING
+  PARSED
+  NEEDS_REVIEW
+  REJECTED
+  FAILED
+}
+
+enum SeatingPlanStatus {
+  DRAFT
+  APPROVED
+  PUBLISHED
+  SUPERSEDED
+}
+
+enum SolveJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  INFEASIBLE
+  FAILED
+  CANCELLED
+}
+
+enum SolverStatus {
+  OPTIMAL
+  FEASIBLE
+  INFEASIBLE
+  ERROR
+}
+
+enum AuditAction {
+  PDF_UPLOADED
+  CANDIDATE_MATCHED
+  CANDIDATE_RESOLVED
+  EXAM_CREATED
+  SOLVE_REQUESTED
+  SOLVE_STARTED
+  SOLVE_COMPLETED
+  SOLVE_FAILED
+  PLAN_APPROVED
+  PLAN_PUBLISHED
+  PLAN_SUPERSEDED
+}
+
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
+model Department {
+  id        String    @id @default(uuid()) @map("id")
+  code      String    @unique @map("code")
+  name      String    @map("name")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  classes   Class[]
+
+  @@map("departments")
+}
+
+model Class {
+  id           String     @id @default(uuid()) @map("id")
+  departmentId String     @map("department_id")
+  name         String     @map("name")
+  year         Int        @map("year")
+  section      String     @map("section")
+  academicYear String     @map("academic_year")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  department   Department @relation(fields: [departmentId], references: [id])
+  students     Student[]
+
+  @@index([departmentId])
+  @@unique([departmentId, name, academicYear])
+  @@map("classes")
+}
+
+model Student {
+  id             String        @id @default(uuid()) @map("id")
+  name           String        @map("name")
+  rollNumber     String        @map("roll_number")
+  registerNumber String        @unique @map("register_number")
+  gender         Gender        @map("gender")
+  classId        String        @map("class_id")
+  status         StudentStatus @default(ACTIVE) @map("status")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  class          Class         @relation(fields: [classId], references: [id])
+  examCandidates ExamCandidate[]
+
+  @@index([rollNumber])
+  @@index([classId])
+  @@index([status])
+  @@map("students")
+}
+
+model Exam {
+  id           String                  @id @default(uuid()) @map("id")
+  examDate     DateTime                @map("exam_date")
+  session      ExamSession             @map("session")
+  examType     ExamType                @default(UNIVERSITY) @map("exam_type")
+  status       ExamStatus              @default(DRAFT) @map("status")
+  createdAt    DateTime                @default(now()) @map("created_at")
+  updatedAt    DateTime                @updatedAt @map("updated_at")
+  candidates   ExamCandidate[]
+  documents    UploadedExamDocument[]
+  seatingPlans SeatingPlan[]
+  solveJobs    SolveJob[]
+
+  @@index([status])
+  @@map("exams")
+}
+
+model ExamCandidate {
+  id                      String                   @id @default(uuid()) @map("id")
+  examId                  String                   @map("exam_id")
+  studentId               String                   @map("student_id")
+  sourceDocumentId        String?                  @map("source_document_id")
+  registerNumberSnapshot  String                   @map("register_number_snapshot")
+  studentNameSnapshot     String                   @map("student_name_snapshot")
+  departmentSnapshot      String                   @map("department_snapshot")
+  genderSnapshot          Gender                   @map("gender_snapshot")
+  classSnapshot           String                   @map("class_snapshot")
+  subjectCode             String                   @map("subject_code")
+  subjectName             String                   @map("subject_name")
+  validationStatus        CandidateValidationStatus @default(UNVERIFIED) @map("validation_status")
+  createdAt               DateTime                 @default(now()) @map("created_at")
+  updatedAt               DateTime                 @updatedAt @map("updated_at")
+  exam                    Exam                     @relation(fields: [examId], references: [id])
+  student                 Student                  @relation(fields: [studentId], references: [id])
+  sourceDocument          UploadedExamDocument?    @relation(fields: [sourceDocumentId], references: [id])
+  seatAssignments         SeatAssignment[]
+
+  @@index([examId])
+  @@index([studentId])
+  @@index([registerNumberSnapshot])
+  @@index([validationStatus])
+  @@unique([examId, registerNumberSnapshot])
+  @@unique([examId, studentId])
+  @@map("exam_candidates")
+}
+
+model UploadedExamDocument {
+  id            String              @id @default(uuid()) @map("id")
+  examId        String              @map("exam_id")
+  fileName      String              @map("file_name")
+  storagePath   String              @map("storage_path")
+  mimeType      String              @map("mime_type")
+  fileSize      Int                 @default(0) @map("file_size")
+  fileHash      String              @map("file_hash")
+  parseStatus   DocumentParseStatus @default(UPLOADED) @map("parse_status")
+  parseMetadata Json?               @map("parse_metadata")
+  uploadedBy    String?             @map("uploaded_by")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+  exam          Exam                @relation(fields: [examId], references: [id])
+  candidates    ExamCandidate[]
+
+  @@index([examId])
+  @@index([parseStatus])
+  @@unique([examId, fileHash])
+  @@map("uploaded_exam_documents")
+}
+
+model Hall {
+  id        String        @id @default(uuid()) @map("id")
+  hallNumber String       @unique @map("hall_number")
+  name      String        @map("name")
+  building  String?       @map("building")
+  rows      Int           @map("rows")
+  columns   Int           @map("columns")
+  isActive  Boolean       @default(true) @map("is_active")
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  seats     HallSeat[]
+  seatAssignments SeatAssignment[]
+
+  @@map("halls")
+}
+
+model HallSeat {
+  id              String           @id @default(uuid()) @map("id")
+  hallId          String           @map("hall_id")
+  seatPosition    String           @map("seat_position")
+  row             String           @map("row")
+  column          Int              @map("column")
+  isActive        Boolean          @default(true) @map("is_active")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  hall            Hall             @relation(fields: [hallId], references: [id])
+  seatAssignments SeatAssignment[]
+
+  @@index([hallId])
+  @@index([isActive])
+  @@unique([hallId, seatPosition])
+  @@map("hall_seats")
+}
+
+model SeatingPlan {
+  id                String            @id @default(uuid()) @map("id")
+  examId            String            @map("exam_id")
+  version           Int               @map("version")
+  status            SeatingPlanStatus @default(DRAFT) @map("status")
+  supersedesPlanId  String?           @map("supersedes_plan_id")
+  createdBy         String?           @map("created_by")
+  approvedBy        String?           @map("approved_by")
+  publishedBy       String?           @map("published_by")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  approvedAt        DateTime?         @map("approved_at")
+  publishedAt       DateTime?         @map("published_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  exam              Exam              @relation(fields: [examId], references: [id])
+  supersedesPlan    SeatingPlan?      @relation("PlanSupersession", fields: [supersedesPlanId], references: [id])
+  supersededBy      SeatingPlan[]     @relation("PlanSupersession")
+  assignments       SeatAssignment[]
+
+  @@unique([examId, version])
+  @@index([examId])
+  @@index([status])
+  @@map("seating_plans")
+}
+
+model SeatAssignment {
+  id              String        @id @default(uuid()) @map("id")
+  seatingPlanId   String        @map("seating_plan_id")
+  examCandidateId String        @map("exam_candidate_id")
+  hallId          String        @map("hall_id")
+  hallSeatId      String        @map("hall_seat_id")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  seatingPlan     SeatingPlan   @relation(fields: [seatingPlanId], references: [id])
+  examCandidate   ExamCandidate @relation(fields: [examCandidateId], references: [id])
+  hall            Hall          @relation(fields: [hallId], references: [id])
+  hallSeat        HallSeat      @relation(fields: [hallSeatId], references: [id])
+
+  @@unique([seatingPlanId, examCandidateId])
+  @@unique([seatingPlanId, hallId, hallSeatId])
+  @@index([seatingPlanId])
+  @@index([examCandidateId])
+  @@index([hallId])
+  @@map("seat_assignments")
+}
+
+model SolveJob {
+  id                  String        @id @default(uuid()) @map("id")
+  examId              String        @map("exam_id")
+  status              SolveJobStatus @default(QUEUED) @map("status")
+  solverStatus        SolverStatus?  @map("solver_status")
+  requestedBy         String?        @map("requested_by")
+  startedAt           DateTime?      @map("started_at")
+  completedAt         DateTime?      @map("completed_at")
+  heartbeatAt         DateTime?      @map("heartbeat_at")
+  candidateCount      Int            @default(0) @map("candidate_count")
+  hallCount           Int            @default(0) @map("hall_count")
+  assignedCount       Int            @default(0) @map("assigned_count")
+  unassignedCount     Int            @default(0) @map("unassigned_count")
+  solverDurationMs    Int?           @map("solver_duration_ms")
+  timeLimitSeconds    Int?           @map("time_limit_seconds")
+  errorCode           String?        @map("error_code")
+  errorMessage        String?        @map("error_message")
+  infeasibilityReason String?        @map("infeasibility_reason")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+  exam                Exam           @relation(fields: [examId], references: [id])
+
+  @@index([examId])
+  @@index([status])
+  @@index([heartbeatAt])
+  @@map("solve_jobs")
+}
+
+model AuditLog {
+  id         String       @id @default(uuid()) @map("id")
+  actorId    String?      @map("actor_id")
+  action     AuditAction  @map("action")
+  entityType String       @map("entity_type")
+  entityId   String       @map("entity_id")
+  metadata   Json?        @map("metadata")
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([actorId])
+  @@map("audit_logs")
+}
