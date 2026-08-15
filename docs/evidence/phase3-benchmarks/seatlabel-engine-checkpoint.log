@@ -1,0 +1,93 @@
+PHASE 3 — SESSION & PHYSICAL-DOMAIN PARTITIONED SEATING ENGINE
+Milestone: Phase A-E implementation (seat-label engine)
+Date: 2026-08-15
+Spec: docs/phase3-cpsat-spec.md Revision 7 (§39)
+Status: IMPLEMENTED / VERIFIED (Phase D PASS, Phase E all buckets PASS)
+
+=== OWNER APPROVAL PROVENANCE ===
+The Session & Physical-Domain Partitioned Seating Engine specification (78 sections,
+including the physical-domain partition invariants, seat-label channeling formulation
+X/O/D/Y/K with EMPTY sentinels, three anti-adjacency policy modes, the 1000-candidate
+hard ceiling, composition/capacity guards, objective reporting rule, error-code table,
+status terms, and Phase A-E implementation order) was PROVIDED BY THE OWNER and
+APPROVED FOR IMPLEMENTATION in the OpenCode session on 2026-08-15.
+No solver/model decision in this milestone was self-approved by the agent; where the
+spec left a choice, the chosen value is a documented INTERPRETATION below.
+Owner correction (recorded 2026-08-15): composition risk ratios (e.g. >0.50) are
+CONFIGURABLE scheduling-risk thresholds, NOT mathematical infeasibility proofs;
+the 1000-candidate domain ceiling remains a HARD architectural guard until benchmark
+evidence supports raising it.
+
+=== IMPLEMENTATION (NEW MODULES, ADDITIVE) ===
+- app/graph.py            Phase A: PhysicalSeatGraph, adjacency config (eight/cardinal),
+                          hall-isolation + geometry validation.
+- app/partition.py        Phase B: Union-Find connected components (domains), partition
+                          invariants, ceiling guard, topology_anomaly_evidence, balanced
+                          candidate-allocation helper.
+- app/guards.py           Composition/capacity guard (BALANCED / IMBALANCE_RISK /
+                          INSUFFICIENT_CAPACITY) with configurable risk thresholds.
+- app/seatlabel.py        Phase C: seat-label CP-SAT model, per-domain solve, authoritative
+                          validator, objective reporting (§18 incl. ERR_VALIDATOR_MISMATCH),
+                          solve_domain / solve_partitioned / partitioned_detail.
+- app/models.py           Candidate.year (optional), SolverConfig.policyMode / adjacency /
+                          compositionAction (non-breaking defaults).
+- benchmarks/dataset.py   build_200_dataset / build_800_dataset / build_n_dataset.
+- benchmarks/benchmark_phase_d.py     Phase D equivalence (legacy vs new).
+- benchmarks/benchmark_seatlabel.py   Phase E partitioned buckets.
+- tests/test_graph.py, test_partition.py, test_guards.py, test_seatlabel.py  (34 new tests).
+
+=== KEY DECISIONS (documented INTERPRETATIONS) ===
+1. Adjacency default = eight (8-neighbourhood within a hall) to match the legacy
+   formulation and make Phase D equivalence meaningful; cardinal supported.
+2. Soft objective = minimize adjacent OCCUPIED same-department seat pairs (§11-compatible);
+   forced to 0 under DEPARTMENT_ONLY / STRICT_DEPT_OR_YEAR, meaningful under COHORT.
+3. All domain candidates are seated (sum_s X[c,s] == 1); capacity guaranteed by the
+   composition guard before CP-SAT (candidateCount > seatCount => ERR_INSUFFICIENT_DOMAIN_CAPACITY).
+4. Error-code extension (documented in spec §39.2.8): ERR_INVALID_POLICY_CONFIGURATION
+   for policies requiring a 'year' attribute when candidates lack one.
+5. Composition year/cohort risk flagged only when >=2 distinct buckets exist (a single
+   year is structure, not imbalance).
+6. Candidate-to-domain allocation is a deterministic balanced helper (benchmark/scheduling
+   shape); the orchestrator owns allocation at deployment (§11.1). Allocation never splits
+   a connected component and never uses department as a hard partitioning rule.
+
+=== VERIFICATION ===
+- pytest -q: 80 passed (46 legacy + 34 new), 1 pre-existing Starlette warning.
+- Phase D equivalence (50/100/200/300): ALL_EQUIVALENCE_PASS=True, PHASE D = PASS
+  (legacy and new both OPTIMAL, new passes authoritative validator, reported objective
+  == validator objective).
+- Phase E buckets 200/500/800/1000: every domain OPTIMAL, objective 0, all candidates
+  seated, per-domain build/solve/total separated.
+  - 200: 2 domains, 6.1 s, 296.4 MB, 21,054 vars / 2,762 cons
+  - 500: 5 domains, 16.5 s, 327.8 MB, 52,635 vars / 6,905 cons
+  - 800: 8 domains, 29.3 s, 373.1 MB, 84,216 vars / 11,048 cons
+  - 1000: 10 domains, 38.6 s, 425.4 MB, 105,270 vars / 13,810 cons, all OPTIMAL
+  vs legacy monolithic 1000: 139.7 s, 4,518.9 MB, 203,270 vars / 233,900 cons, FEASIBLE.
+
+=== MEASURED FACT vs TARGET HYPOTHESIS vs INTERPRETATION ===
+- MEASURED FACT: Phase D/E timings, memory, var/con counts above (raw logs cited below).
+- TARGET HYPOTHESIS: Phase E buckets were hypothesis (§49); now measured. Seat counts in
+  the buckets equal candidate counts exactly (200/500/800/1000 seats).
+- INTERPRETATION: seat-label D[i]!=D[j] reification dominates per-domain solve cost
+  (~3-4 s per 100-seat domain on the 8-core host); time/memory scale linearly with
+  domain count. Not a solver defect.
+
+=== EVIDENCE ===
+- docs/evidence/phase3-benchmarks/phaseD-legacy-vs-seatlabel-50-100-200-300.log
+- docs/evidence/phase3-benchmarks/phaseE-seatlabel-200-500-800-1000.log
+- docs/phase3-benchmarks.md §16/§17
+- docs/phase3-cpsat-spec.md Revision 7 (§39)
+
+=== SCOPE FENCE (NOT DONE, OWNER-ACKNOWLEDGED OUT OF SCOPE) ===
+Node worker orchestration; per-domain /solve API wiring; timetable generation;
+automatic scheduling; UI/DB/auth/hall-management redesign; production deployment;
+4,000/10,000 monolithic benchmarks. 4,000+ institution path = sessions x domains
+(each <= 1000 candidates), per the approved architecture.
+
+=== REGRESSION STATUS ===
+pytest: PASS (80). npm test: frozen baseline (85 passed / 3 skipped, 12 files passed /
+1 skipped) — re-run captured in npm-test.log. Phase 2 protection: no tracked diffs
+under prisma/ or src/.
+
+=== COMMIT STATUS ===
+(updated after push; fresh git evidence captured post-commit)

@@ -1,23 +1,7 @@
-CAPTURED: 2026-08-15T10:33:56.1111688+05:30
-BRANCH: main
-
-git : warning: in the working copy of 'docs/evidence/phase3-benchmarks/1000-checkpoint.log', LF will be replaced by 
-CRLF the next time Git touches it
-At line:1 char:168
-+ ... us.log" 2>&1; git diff --stat > "$dir\git-diff-stat.log" 2>&1; git di ...
-+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (warning: in the... Git touches it:String) [], RemoteException
-    + FullyQualifiedErrorId : NativeCommandError
- 
-warning: in the working copy of 'docs/evidence/phase3-benchmarks/npm-test.log', LF will be replaced by CRLF the next 
-time Git touches it
-warning: in the working copy of 'docs/phase3-benchmarks.md', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'docs/phase3-cpsat-spec.md', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'solver-service/benchmarks/dataset.py', LF will be replaced by CRLF the next time Git 
-touches it
- .../evidence/phase3-benchmarks/1000-checkpoint.log |  13 ++
- docs/evidence/phase3-benchmarks/npm-test.log       | 160 ++++++++++-----------
- docs/phase3-benchmarks.md                          |  70 ++++++++-
- docs/phase3-cpsat-spec.md                          |  45 +++++-
- solver-service/benchmarks/dataset.py               |  42 +++++-
- 5 files changed, 241 insertions(+), 89 deletions(-)
+﻿ docs/evidence/phase3-benchmarks/git-diff-stat.log | 23 ------
+ docs/evidence/phase3-benchmarks/git-status.log    | 49 +++++-------
+ docs/phase3-benchmarks.md                         | 58 +++++++++++++-
+ docs/phase3-cpsat-spec.md                         | 41 +++++++++-
+ solver-service/app/models.py                      |  8 ++
+ solver-service/benchmarks/dataset.py              | 93 +++++++++++++++++++++++
+ 6 files changed, 214 insertions(+), 58 deletions(-)

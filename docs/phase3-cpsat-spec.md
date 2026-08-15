@@ -2,12 +2,13 @@
 
 > Specification only. No solver, FastAPI, Python, worker, or CP-SAT code is implemented by this document.
 > The authoritative source of the current repository state is `docs/phase3-discovery.md` and the source files it cites.
+> **Revision 7.** Revision 7 documents the owner-approved **Session & Physical-Domain Partitioned Seating Engine** (2026-08-15) and its implementation as the new seat-label engine (`app/graph.py`, `app/partition.py`, `app/guards.py`, `app/seatlabel.py`; §39). The engine introduces: the physical interaction graph with connected-component domains; the seat-label channeling formulation (`X/O/D/Y/K` with EMPTY sentinels); the three anti-adjacency policy modes reified on occupancy; the 1,000-candidate hard domain ceiling; the pre-dispatch composition/capacity guard with configurable (non-infeasibility) risk thresholds; §18 objective reporting including `ERR_VALIDATOR_MISMATCH`; and the legacy-vs-new equivalence (Phase D) and partitioned benchmark buckets (Phase E). The legacy Approach C / Encoding D solver is **unchanged** and retained as the equivalence reference. The Node worker orchestration, per-domain `/solve` API wiring, and the 4,000/10,000 monolithic benchmarks remain OUT OF SCOPE (§39).
 > **Revision 6.** Revision 6 documents the objective-reporting rule for the solver response: the externally reported `objectiveValue` is always derived from the returned candidate→seat assignment, not from CP-SAT's internal `ObjectiveValue()` (§5, §11, §29). For **OPTIMAL** the two must agree; for **FEASIBLE** the raw `solver.ObjectiveValue()` may be inflated because the objective variables `o[s,t]` are only lower-bounded by the linking constraints and CP-SAT is not guaranteed to have minimized every auxiliary `o[s,t]` to its tight lower bound before a timeout — so the authoritative externally reported objective for FEASIBLE responses is `sameDepartmentAdjacentCount(returned assignment)`. This is a **reporting-only** change (owner-approved): the CP-SAT mathematical objective, Encoding D, the validator, and all frozen decisions are unchanged.
 > **Revision 5.** Revision 5 resolves the last PROPOSED V1 decision (§28 item 10): the worker-count question is answered by the 500-student benchmark — `num_search_workers` is now **8** for production (§12, §15). It also adds the production memory-sizing note distinguishing the Approach A oracle from the Approach C + Encoding D production path (§12). No mathematical section, Encoding D, hard-rule scope, or objective changes. Revision 4 (below) introduced the oracle-agreement criterion and made independent-set pre-computation optional.
 
 **Baseline:** `c7b4bc9` — `feat: complete exam document ingestion phase`
 **Phase 2 status:** COMPLETE / VERIFIED / FROZEN
-**Phase 3 status:** SPECIFICATION ONLY — IMPLEMENTATION NOT STARTED
+**Phase 3 status:** PARTITIONED SEAT-LABEL ENGINE IMPLEMENTED / VERIFIED (Phase A–E). Legacy Approach C retained as reference. Node worker, per-domain API wiring, and 4,000/10,000 monolithic benchmarks: NOT STARTED (out of scope).
 
 ---
 
@@ -1002,3 +1003,39 @@ Only `docs/phase3-cpsat-spec.md` may change as a result of this revision. No Pyt
 2. **Owner-approved fix is reporting-only (§5.1, §11, §29):** for FEASIBLE responses `solve_request` reports `objectiveValue = sameDepartmentAdjacentCount(returned assignment)` instead of `round(solver.ObjectiveValue())`; OPTIMAL reporting is unchanged. The raw solver objective is preserved in benchmark diagnostics/evidence. The fixed 1,000 run reported objective 272 == `sameDepartmentAdjacentCount` 272, valid=True, EXIT CODE: 0 (`docs/evidence/phase3-benchmarks/1000-production-8w-fixed.log`).
 3. **Explicitly unchanged:** the CP-SAT mathematical objective (`min Σ o[s,t]`, §11), the linking constraints, Encoding D, the validator (§29), Approach C, worker count, seed, and all frozen decisions. The objective-reporting rule is a **documentation of reporting behavior**, not a change to the mathematical model, and the validator is not weakened.
 4. **No implementation outside scope:** this revision changes `docs/phase3-cpsat-spec.md` only; the already-shipped solver reporting fix (§5.1) is the owner-approved implementation of this rule. No Prisma, migration, Phase 2, worker, or unrelated file is touched by this revision.
+
+## 39. Revision 7 — Session & Physical-Domain Partitioned Seating Engine (owner-approved, implemented)
+
+The owner approved a new architecture for Phase 3: **candidates who physically interact within the same exam session and the same connected physical seating domain** form the fundamental solver unit. A physical domain is a connected component of the physical interaction graph. Institutional scale (4,000+) is reached by partitioning across sessions/domains, never by one monolithic CP-SAT model.
+
+### 39.1 Architectural invariants (enforced in code)
+
+1. **Adjacency Isolation Invariant:** for every adjacency edge `(s1,s2) ∈ A`, `domain(s1) == domain(s2)` — an edge never crosses a domain boundary (`DomainPartitioner.verify_partition_invariants`, `app/partition.py`).
+2. **Session Independence Invariant:** sessions share no variables/constraints; each solve call is one domain.
+3. **Candidate Partition Invariant:** every candidate belongs to exactly one domain.
+4. **Seat Partition Invariant:** every seat belongs to exactly one domain.
+5. **Ceiling:** `MAX_DOMAIN_CANDIDATES = 1000` is a **hard architectural guard**; a domain exceeding it returns `ERR_GRAPH_TOPOLOGY_OVERSIZED_COMPONENT` before CP-SAT is instantiated. Increasing the ceiling requires benchmark evidence and an owner decision.
+
+### 39.2 Implementation decisions and interpretations
+
+1. **Module layout (new, additive):** `app/graph.py` (Phase A — `PhysicalSeatGraph`, adjacency configuration, hall-isolation/geometry checks); `app/partition.py` (Phase B — Union-Find connected components, partition invariants, ceiling, `topology_anomaly_evidence`, deterministic balanced candidate allocation helper); `app/guards.py` (composition/capacity guard, §26–§29); `app/seatlabel.py` (Phase C — seat-label model, per-domain solve, authoritative validator, §18 reporting, `solve_domain` / `solve_partitioned` / `partitioned_detail`).
+2. **Models:** `Candidate.year` added as optional (needed for `Y[s]`/`K[s]`); `SolverConfig` gained `policyMode` (`DEPARTMENT_ONLY` default, `STRICT_DEPT_OR_YEAR`, `COHORT`), `adjacency` (`eight` default, `cardinal`), `compositionAction` (`warn` default, `reject`). Legacy fields unchanged.
+3. **Adjacency default `eight`:** the 8-neighbourhood within a hall (Chebyshev 1), matching the legacy formulation so Phase D equivalence is meaningful; `cardinal` (horizontal + vertical) is supported and configurable.
+4. **Seat-label formulation** (`app/seatlabel.py`): `X[c,s]`, `O[s]=Σ X[c,s]`, `D[s]` (department label, `0 = EMPTY`), `Y[s]`/`K[s]` similarly with EMPTY sentinels. Channeling via linear weighted sums `D[s] = Σ X[c,s]·deptIndex(c)` (EMPTY index 0), giving target complexity `O(|S|×|C| + |A|)`.
+5. **Anti-adjacency reified on occupancy** — never blind label inequality: `DEPARTMENT_ONLY` ⇒ `D[s1]≠D[s2]`; `STRICT_DEPT_OR_YEAR` ⇒ `D[s1]≠D[s2] ∧ Y[s1]≠Y[s2]`; `COHORT` ⇒ `K[s1]≠K[s2]`; each enforced `OnlyEnforceIf([O[s1], O[s2]])`.
+6. **Soft objective:** minimize the number of adjacent **occupied** same-department seat pairs (§11-compatible). Forced to zero under `DEPARTMENT_ONLY`/`STRICT_DEPT_OR_YEAR`; meaningful under `COHORT`.
+7. **§18 objective reporting implemented:** OPTIMAL reports the solver objective and must equal the validator's `sameDepartmentAdjacentCount` (else `ERR_VALIDATOR_MISMATCH`); FEASIBLE reports the validator-derived value. Every candidate in a valid domain is seated (`Σ_s X[c,s] == 1`); capacity is guaranteed by the composition guard before CP-SAT.
+8. **Error-code extension:** `ERR_INVALID_POLICY_CONFIGURATION` added to §31's table for policies that require a `year` attribute when candidates lack one. All other §31 codes are produced by the pipeline as specified.
+9. **Composition guard thresholds are configurable risk signals, NOT infeasibility proofs** (owner correction, 2026-08-15). Only `candidateCount > seatCount` is a hard capacity error (`ERR_INSUFFICIENT_DOMAIN_CAPACITY`). Year/cohort risk is only flagged when ≥2 distinct buckets exist (a single year is structure, not imbalance).
+10. **Candidate-to-domain allocation:** the deterministic balanced helper in `app/partition.py` is used by tests/benchmarks and documents the scheduling shape; at deployment, the orchestrator owns allocation (§11.1). Allocation never splits a department as a hard rule and never splits a connected component.
+
+### 39.3 Verification and evidence
+
+1. **Regression:** full pytest suite 80 passed (46 legacy + 34 new: graph, partition, guards, seat-label), 1 pre-existing warning. `npm test` frozen baseline unchanged (85 passed / 3 skipped, 12 files passed / 1 skipped).
+2. **Phase D (equivalence, legacy vs new, §40/§41):** 50/100/200/300 — both formulations OPTIMAL, all assignments valid, new passes the authoritative seat-label validator, reported objective == validator objective. `ALL_EQUIVALENCE_PASS=True` (`docs/evidence/phase3-benchmarks/phaseD-legacy-vs-seatlabel-50-100-200-300.log`).
+3. **Phase E (partitioned buckets, §42–§49):** 200/500/800/1000 — every domain OPTIMAL, objective 0, all candidates seated, per-domain build/solve/total separated. 1,000: 10 domains × 100 candidates, 38.6 s total, 425.4 MB peak, 105,270 vars / 13,810 cons — versus the legacy monolithic 1,000: 139.7 s, 4,518.9 MB, 203,270 vars / 233,900 cons, FEASIBLE. Buckets are **Target Hypothesis** (§49) and now measured: 200/500/800/1000 candidates at exactly matching seat counts (`docs/evidence/phase3-benchmarks/phaseE-seatlabel-200-500-800-1000.log`).
+4. **Known limitation:** the seat-label `D[i]≠D[j]` reification is the dominant per-domain solve cost (~3–4 s per 100-seat domain on the 8-core host); solve time scales linearly with domain count because every Phase E domain is one hall.
+
+### 39.4 Scope fence (unchanged)
+
+OUT OF SCOPE and NOT STARTED: Node worker orchestration, per-domain `/solve` API wiring/endpoint selection, timetable generation, automatic scheduling, UI/DB/auth/hall-management redesign, production deployment, and the 4,000/10,000 **monolithic** benchmarks. The 4,000/10,000 institution path proceeds via sessions/domains per this architecture (each domain ≤ 1,000 candidates).

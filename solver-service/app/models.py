@@ -23,6 +23,7 @@ class Candidate(BaseModel):
     gender: Gender = "OTHER"
     subjectCode: str = ""
     subjectName: str = ""
+    year: Optional[str] = None
 
 
 class Seat(BaseModel):
@@ -58,11 +59,18 @@ class Hall(BaseModel):
         return v
 
 
+PolicyMode = Literal["DEPARTMENT_ONLY", "STRICT_DEPT_OR_YEAR", "COHORT"]
+AdjacencyMode = Literal["eight", "cardinal"]
+
+
 class SolverConfig(BaseModel):
     model: ModelKind = "structured"
     hardRuleScope: ScopeKind = "class"
     randomSeed: int = Field(default=42, ge=0)
     numSearchWorkers: Optional[int] = Field(default=None, ge=1)
+    policyMode: PolicyMode = "DEPARTMENT_ONLY"
+    adjacency: AdjacencyMode = "eight"
+    compositionAction: Literal["warn", "reject"] = "warn"
 
 
 class SolveRequest(BaseModel):

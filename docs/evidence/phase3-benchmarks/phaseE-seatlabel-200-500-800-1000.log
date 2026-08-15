@@ -1,0 +1,135 @@
+﻿
+=== PHASE E ù 200-STUDENT SEAT-LABEL PARTITIONED BENCHMARK ===
+distribution: {"candidateCount": 200, "hallCount": 2, "seatCount": 200, "classCount": 40, "departmentCount": 10, "studentsPerClass": 5, "studentsPerDepartment": 20, "rowsPerHall": 5, "columnsPerHall": 20}
+config: engine=seat-label policy=DEPARTMENT_ONLY adjacency=eight num_search_workers=8 random_seed=42 perDomainTimeLimitSeconds=60
+status=OPTIMAL
+objective=0
+validatorObjective=0
+modelBuildMs=370.1 (sum over domains)
+solveMs=5691.3 (sum over domains)
+totalDurationMs=6061.5 (sum over domains)
+wallClockMs=6097
+variableCount=21054
+constraintCount=2762
+assignedCount=200
+unassignedCount=0
+memoryPeak=296.4 MB
+cpuPeak=715.7%
+numSearchWorkers=8
+randomSeed=42
+timeLimitSeconds=60
+domainCount=2
+largestDomainCandidates=100
+valid=True
+
+domains:
+  component-00 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=191.6 solveMs=2963.7 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-01 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=178.4 solveMs=2727.6 vars=10527 cons=1381 assigned=100 unassigned=0
+
+BUCKET = PASS (all domains OPTIMAL)
+
+=== PHASE E ù 500-STUDENT SEAT-LABEL PARTITIONED BENCHMARK ===
+distribution: {"candidateCount": 500, "hallCount": 5, "seatCount": 500, "classCount": 100, "departmentCount": 10, "studentsPerClass": 5, "studentsPerDepartment": 50, "rowsPerHall": 5, "columnsPerHall": 20}
+config: engine=seat-label policy=DEPARTMENT_ONLY adjacency=eight num_search_workers=8 random_seed=42 perDomainTimeLimitSeconds=60
+status=OPTIMAL
+objective=0
+validatorObjective=0
+modelBuildMs=868.6 (sum over domains)
+solveMs=15602.7 (sum over domains)
+totalDurationMs=16471.4 (sum over domains)
+wallClockMs=16568
+variableCount=52635
+constraintCount=6905
+assignedCount=500
+unassignedCount=0
+memoryPeak=327.8 MB
+cpuPeak=728.2%
+numSearchWorkers=8
+randomSeed=42
+timeLimitSeconds=60
+domainCount=5
+largestDomainCandidates=100
+valid=True
+
+domains:
+  component-00 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=172.5 solveMs=3409.8 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-01 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=172.1 solveMs=3087.7 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-02 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=173.7 solveMs=3210.3 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-03 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=175.2 solveMs=2953.9 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-04 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=175.1 solveMs=2941.0 vars=10527 cons=1381 assigned=100 unassigned=0
+
+BUCKET = PASS (all domains OPTIMAL)
+
+=== PHASE E ù 800-STUDENT SEAT-LABEL PARTITIONED BENCHMARK ===
+distribution: {"candidateCount": 800, "hallCount": 8, "seatCount": 800, "classCount": 160, "departmentCount": 10, "studentsPerClass": 5, "studentsPerDepartment": 80, "rowsPerHall": 5, "columnsPerHall": 20}
+config: engine=seat-label policy=DEPARTMENT_ONLY adjacency=eight num_search_workers=8 random_seed=42 perDomainTimeLimitSeconds=60
+status=OPTIMAL
+objective=0
+validatorObjective=0
+modelBuildMs=1582.0 (sum over domains)
+solveMs=27704.9 (sum over domains)
+totalDurationMs=29287.2 (sum over domains)
+wallClockMs=29495
+variableCount=84216
+constraintCount=11048
+assignedCount=800
+unassignedCount=0
+memoryPeak=373.1 MB
+cpuPeak=732.2%
+numSearchWorkers=8
+randomSeed=42
+timeLimitSeconds=60
+domainCount=8
+largestDomainCandidates=100
+valid=True
+
+domains:
+  component-00 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=185.2 solveMs=2677.8 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-01 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=182.0 solveMs=4445.7 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-02 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=306.0 solveMs=3470.1 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-03 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=191.7 solveMs=4483.6 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-04 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=186.1 solveMs=2854.5 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-05 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=173.5 solveMs=2931.2 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-06 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=181.9 solveMs=3350.6 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-07 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=175.6 solveMs=3491.4 vars=10527 cons=1381 assigned=100 unassigned=0
+
+BUCKET = PASS (all domains OPTIMAL)
+
+=== PHASE E ù 1000-STUDENT SEAT-LABEL PARTITIONED BENCHMARK ===
+distribution: {"candidateCount": 1000, "hallCount": 10, "seatCount": 1000, "classCount": 200, "departmentCount": 10, "studentsPerClass": 5, "studentsPerDepartment": 100, "rowsPerHall": 5, "columnsPerHall": 20}
+config: engine=seat-label policy=DEPARTMENT_ONLY adjacency=eight num_search_workers=8 random_seed=42 perDomainTimeLimitSeconds=60
+status=OPTIMAL
+objective=0
+validatorObjective=0
+modelBuildMs=1800.7 (sum over domains)
+solveMs=36800.8 (sum over domains)
+totalDurationMs=38601.8 (sum over domains)
+wallClockMs=38807
+variableCount=105270
+constraintCount=13810
+assignedCount=1000
+unassignedCount=0
+memoryPeak=425.4 MB
+cpuPeak=750.6%
+numSearchWorkers=8
+randomSeed=42
+timeLimitSeconds=60
+domainCount=10
+largestDomainCandidates=100
+valid=True
+
+domains:
+  component-00 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=174.2 solveMs=3497.1 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-01 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=179.9 solveMs=4700.2 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-02 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=195.4 solveMs=2765.8 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-03 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=172.7 solveMs=3636.0 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-04 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=172.8 solveMs=3036.4 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-05 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=180.0 solveMs=2628.8 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-06 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=189.8 solveMs=4597.9 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-07 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=176.7 solveMs=4583.9 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-08 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=178.1 solveMs=4657.7 vars=10527 cons=1381 assigned=100 unassigned=0
+  component-09 candidates=100 seats=100 status=OPTIMAL objective=0 buildMs=181.1 solveMs=2697.1 vars=10527 cons=1381 assigned=100 unassigned=0
+
+BUCKET = PASS (all domains OPTIMAL)
+
+PHASE E EXIT CODE = 0

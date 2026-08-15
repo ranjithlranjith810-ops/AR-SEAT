@@ -1,29 +1,20 @@
-CAPTURED: 2026-08-15T10:33:56.1111688+05:30
-BRANCH: main
-
-On branch main
-Your branch is up to date with 'origin/main'.
-
-Changes not staged for commit:
-  (use "git add <file>..." to update what will be committed)
-  (use "git restore <file>..." to discard changes in working directory)
-	modified:   docs/evidence/phase3-benchmarks/1000-checkpoint.log
-	modified:   docs/evidence/phase3-benchmarks/npm-test.log
-	modified:   docs/phase3-benchmarks.md
-	modified:   docs/phase3-cpsat-spec.md
-	modified:   solver-service/benchmarks/dataset.py
-
-Untracked files:
-  (use "git add <file>..." to include in what will be committed)
-	docs/evidence/phase3-benchmarks/2000-checkpoint.log
-	docs/evidence/phase3-benchmarks/2000-production-8w.log
-	docs/evidence/phase3-benchmarks/git-diff-name-only.log
-	docs/evidence/phase3-benchmarks/git-diff-stat.log
-	docs/evidence/phase3-benchmarks/git-log.log
-	docs/evidence/phase3-benchmarks/git-status.log
-	docs/evidence/phase3-benchmarks/phase3-spec-diff.log
-	docs/phase3-discovery.md
-	"eating prototype\357\200\242"
-	solver-service/benchmarks/benchmark_2000.py
-
-no changes added to commit (use "git add" and/or "git commit -a")
+﻿ M docs/evidence/phase3-benchmarks/git-status.log
+ M docs/phase3-benchmarks.md
+ M docs/phase3-cpsat-spec.md
+ M solver-service/app/models.py
+ M solver-service/benchmarks/dataset.py
+?? docs/evidence/phase3-benchmarks/phaseD-legacy-vs-seatlabel-50-100-200-300.log
+?? docs/evidence/phase3-benchmarks/phaseE-seatlabel-200-500-800-1000.log
+?? docs/evidence/phase3-benchmarks/seatlabel-engine-checkpoint.log
+?? docs/phase3-discovery.md
+?? "eating prototype\357\200\242"
+?? solver-service/app/graph.py
+?? solver-service/app/guards.py
+?? solver-service/app/partition.py
+?? solver-service/app/seatlabel.py
+?? solver-service/benchmarks/benchmark_phase_d.py
+?? solver-service/benchmarks/benchmark_seatlabel.py
+?? solver-service/tests/test_graph.py
+?? solver-service/tests/test_guards.py
+?? solver-service/tests/test_partition.py
+?? solver-service/tests/test_seatlabel.py

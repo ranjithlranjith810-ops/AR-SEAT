@@ -22,6 +22,12 @@ CLASS_SUFFIXES_2000 = [
     *[f"A{chr(ord('A') + i)}" for i in range(14)],  # AA..AN
 ]  # 40 suffixes
 
+HALLS_200 = [
+    (f"hall-{i+1}", name, 5, 20) for i, name in enumerate(["LH01", "LH02"])
+]
+HALLS_800 = [
+    (f"hall-{i+1}", name, 5, 20) for i, name in enumerate([f"LH{i:02d}" for i in range(1, 9)])
+]
 HALLS_500 = [
     (f"hall-{i+1}", name, 5, 20) for i, name in enumerate(["LH01", "LH02", "LH03", "LH04", "LH05"])
 ]
@@ -48,6 +54,64 @@ def distribution() -> dict:
     }
 
 
+def build_n_dataset(
+    candidate_count: int,
+    time_limit_seconds: int = 120,
+    request_id: str | None = None,
+    exam_id: str | None = None,
+) -> SolveRequest:
+    """Deterministic dataset for exactly ``candidate_count`` candidates (multiple
+    of 50, in [50, 500]) with exactly enough seats. Used for Phase D equivalence
+    and small scaling checks."""
+    assert candidate_count % 50 == 0 and 50 <= candidate_count <= 500, (
+        f"candidate_count must be a multiple of 50 in [50, 500], got {candidate_count}"
+    )
+    hall_count = max(1, -(-candidate_count // 100))
+    seats_per_hall = candidate_count // hall_count
+    columns = seats_per_hall // 5
+    halls = [
+        (f"hall-{i+1}", f"LH{i:02d}", 5, columns) for i in range(hall_count)
+    ]
+    classes_per_dept = candidate_count // 10 // 5
+    suffixes = CLASS_SUFFIXES_2000[:classes_per_dept]
+    return _build(
+        halls=halls,
+        suffixes=suffixes,
+        time_limit_seconds=time_limit_seconds,
+        request_id=request_id or f"bench-{candidate_count}",
+        exam_id=exam_id or f"exam-{candidate_count}",
+    )
+
+
+def build_200_dataset(time_limit_seconds: int = 120) -> SolveRequest:
+    """200 validated candidates, 200 active seats across 2 halls (5x20 each).
+
+    40 classes x 5 students each; 10 departments x 20 students each.
+    """
+    return _build(
+        halls=HALLS_200,
+        suffixes=CLASS_SUFFIXES[:4],  # A..D
+        time_limit_seconds=time_limit_seconds,
+        request_id="bench-200",
+        exam_id="exam-200",
+    )
+
+
+def distribution_200() -> dict:
+    """Exact documented distribution for the 200-student benchmark."""
+    return {
+        "candidateCount": len(DEPARTMENTS) * 4 * 5,
+        "hallCount": len(HALLS_200),
+        "seatCount": sum(rows * cols for _, _, rows, cols in HALLS_200),
+        "classCount": len(DEPARTMENTS) * 4,
+        "departmentCount": len(DEPARTMENTS),
+        "studentsPerClass": 5,
+        "studentsPerDepartment": 4 * 5,
+        "rowsPerHall": 5,
+        "columnsPerHall": 20,
+    }
+
+
 def build_500_dataset(time_limit_seconds: int = 600) -> SolveRequest:
     """500 validated candidates, 500 active seats across 5 halls (5x20 each).
 
@@ -60,6 +124,35 @@ def build_500_dataset(time_limit_seconds: int = 600) -> SolveRequest:
         request_id="bench-500",
         exam_id="exam-500",
     )
+
+
+def build_800_dataset(time_limit_seconds: int = 120) -> SolveRequest:
+    """800 validated candidates, 800 active seats across 8 halls (5x20 each).
+
+    160 classes x 5 students each; 10 departments x 80 students each.
+    """
+    return _build(
+        halls=HALLS_800,
+        suffixes=CLASS_SUFFIXES_1000[:16],  # A..P
+        time_limit_seconds=time_limit_seconds,
+        request_id="bench-800",
+        exam_id="exam-800",
+    )
+
+
+def distribution_800() -> dict:
+    """Exact documented distribution for the 800-student benchmark."""
+    return {
+        "candidateCount": len(DEPARTMENTS) * 16 * 5,
+        "hallCount": len(HALLS_800),
+        "seatCount": sum(rows * cols for _, _, rows, cols in HALLS_800),
+        "classCount": len(DEPARTMENTS) * 16,
+        "departmentCount": len(DEPARTMENTS),
+        "studentsPerClass": 5,
+        "studentsPerDepartment": 16 * 5,
+        "rowsPerHall": 5,
+        "columnsPerHall": 20,
+    }
 
 
 def build_1000_dataset(time_limit_seconds: int = 120) -> SolveRequest:

@@ -1,9 +1,9 @@
-# Phase 3 — CP-SAT Solver Benchmarks: 500-Student Validation & 1000-Student Production-Path Gate
+# Phase 3 — CP-SAT Solver Benchmarks: 500/1000/2000 Monolithic Gates & Seat-Label Partitioned Engine (Phase D/E)
 
-Status: PHASE 3 MILESTONE 2 — COMPLETE / VERIFIED; MILESTONE 3 — VALID FEASIBLE RESULT / OPTIMALITY NOT PROVEN; 2000 CHECKPOINT — SOLVER TIMEOUT (ERROR, no solution within 180 s cap)
+Status: MILESTONE 2 — COMPLETE; MILESTONE 3 — VALID FEASIBLE (1000) / 2000 CHECKPOINT — SOLVER TIMEOUT (ERROR); PHASE D EQUIVALENCE — PASS; PHASE E PARTITIONED BUCKETS — ALL OPTIMAL
 Author: (automated benchmark evidence)
 Date: 2026-08-15
-Spec: `docs/phase3-cpsat-spec.md` Revision 6
+Spec: `docs/phase3-cpsat-spec.md` Revision 7
 
 ## 1. Purpose
 
@@ -263,3 +263,53 @@ Production path only (Approach A NOT run). Config: Approach C, Encoding D,
   (85 passed / 3 skipped, 12 files passed / 1 skipped).
 - Regression: `pytest -q` 46 passed; Phase 2 protection: no tracked diffs under
   `prisma/`, `src/`.
+
+## 16. Phase D — Legacy-vs-New Equivalence (seat-label engine)
+
+The owner-approved partitioned seating engine (`app/graph.py`, `app/partition.py`,
+`app/guards.py`, `app/seatlabel.py`, spec Revision 7 §39) is validated against the
+trusted legacy formulation (Approach C / Encoding D, class scope) on small
+deterministic datasets. Equivalence is about **rules and correctness**, not
+identical assignments (§40/§41): `legacy.valid == new.valid`, the new assignment
+passes the authoritative seat-label validator, and the reported objective equals
+the validator objective (§18).
+
+| Size | Legacy status | Legacy obj | New status | New obj | Assigned | New passes validator | Equivalence |
+|------|---------------|------------|------------|---------|----------|----------------------|-------------|
+| 50   | OPTIMAL       | 0          | OPTIMAL    | 0       | 50       | true                 | true        |
+| 100  | OPTIMAL       | 0          | OPTIMAL    | 0       | 100      | true                 | true        |
+| 200  | OPTIMAL       | 0          | OPTIMAL    | 0       | 200      | true                 | true        |
+| 300  | OPTIMAL       | 0          | OPTIMAL    | 0       | 300      | true                 | true        |
+
+`ALL_EQUIVALENCE_PASS=True`, **PHASE D = PASS**
+(`docs/evidence/phase3-benchmarks/phaseD-legacy-vs-seatlabel-50-100-200-300.log`).
+
+## 17. Phase E — Partitioned benchmark buckets (seat-label engine)
+
+Every hall is a connected component; each component is a domain solved
+independently by the seat-label model, so the largest single domain in the Phase E
+buckets is **one hall (100 candidates / 100 seats)**. Buckets are **Target
+Hypothesis** (§49) and now measured. `model_build_ms` / `solve_ms` /
+`total_duration_ms` are recorded separately per domain (§43); the 2000-run
+instrumentation gap is not repeated.
+
+| Bucket | Domains | Status | Objective | Build ms (Σ) | Solve ms (Σ) | Total ms (Σ) | Vars | Cons | Memory MB | CPU % |
+|--------|---------|--------|-----------|--------------|--------------|--------------|------|------|-----------|-------|
+| 200    | 2       | OPTIMAL | 0         | 370          | 5 691        | 6 062        | 21 054 | 2 762 | 296.4 | 715.7 |
+| 500    | 5       | OPTIMAL | 0         | 869          | 15 603       | 16 471       | 52 635 | 6 905 | 327.8 | 728.2 |
+| 800    | 8       | OPTIMAL | 0         | 1 582        | 27 705       | 29 287       | 84 216 | 11 048 | 373.1 | 732.2 |
+| 1000   | 10      | OPTIMAL | 0         | 1 801        | 36 801       | 38 602       | 105 270 | 13 810 | 425.4 | 750.6 |
+
+- Every domain OPTIMAL, objective 0 (perfect department separation per domain),
+  every candidate seated (`assignedCount == candidateCount`, `unassignedCount == 0`).
+- **1,000 vs legacy monolithic 1,000:** 38.6 s total / 425.4 MB / 105,270 vars /
+  13,810 cons / OPTIMAL — versus 139.7 s / 4,518.9 MB / 203,270 vars / 233,900
+  cons / FEASIBLE (objective 272). The partitioned engine solves each 100-candidate
+  domain independently; time and memory scale linearly with domain count, which is
+  the architectural path to 4,000+ (sessions × domains), never one monolithic model.
+- **Interpretation:** the seat-label `D[s]≠D[j]` reification dominates per-domain
+  solve cost (~3–4 s per 100-seat domain on the 8-core host); this is a measured
+  fact of the implementation, not a target hypothesis.
+- All buckets **PASS** (`docs/evidence/phase3-benchmarks/phaseE-seatlabel-200-500-800-1000.log`).
+- Regression: `pytest -q` **80 passed** (46 legacy + 34 new: graph, partition,
+  guards, seat-label); `npm test` frozen baseline unchanged (85/3, 12/1).

@@ -1,0 +1,10 @@
+﻿=== PHASE D ù LEGACY vs NEW EQUIVALENCE (seat-label DEPARTMENT_ONLY) ===
+config: legacy=Approach C/Encoding D class-scope; new=seat-label; policy=DEPARTMENT_ONLY
+
+{"size": 50, "legacyStatus": "OPTIMAL", "legacyValid": true, "legacyObjective": 0, "legacyAssigned": 50, "newStatus": "OPTIMAL", "newValid": true, "newObjective": 0, "newAssigned": 50, "newUnassigned": 0, "newPassesValidator": true, "sameDepartmentAdjacent": 0, "policyViolations": 0, "equivalence": true}
+{"size": 100, "legacyStatus": "OPTIMAL", "legacyValid": true, "legacyObjective": 0, "legacyAssigned": 100, "newStatus": "OPTIMAL", "newValid": true, "newObjective": 0, "newAssigned": 100, "newUnassigned": 0, "newPassesValidator": true, "sameDepartmentAdjacent": 0, "policyViolations": 0, "equivalence": true}
+{"size": 200, "legacyStatus": "OPTIMAL", "legacyValid": true, "legacyObjective": 0, "legacyAssigned": 200, "newStatus": "OPTIMAL", "newValid": true, "newObjective": 0, "newAssigned": 200, "newUnassigned": 0, "newPassesValidator": true, "sameDepartmentAdjacent": 0, "policyViolations": 0, "equivalence": true}
+{"size": 300, "legacyStatus": "OPTIMAL", "legacyValid": true, "legacyObjective": 0, "legacyAssigned": 300, "newStatus": "OPTIMAL", "newValid": true, "newObjective": 0, "newAssigned": 300, "newUnassigned": 0, "newPassesValidator": true, "sameDepartmentAdjacent": 0, "policyViolations": 0, "equivalence": true}
+
+ALL_EQUIVALENCE_PASS=True
+PHASE D = PASS
