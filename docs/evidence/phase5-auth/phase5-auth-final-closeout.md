@@ -119,6 +119,40 @@ No count drift vs baseline. The 3 skipped tests remain the live Supabase Storage
 `final-typecheck.log`, `final-auth-test.log`, `final-orchestration.log` under
 `docs/evidence/phase5-auth/`.
 
+### 4a. Test G evidence (finalization addendum)
+
+Test G evidence gap resolved.
+
+A fresh isolated execution of Test G was captured in:
+
+```text
+docs/evidence/phase5-auth/auth-test-g.log
+```
+
+Result:
+- wrong credentials
+- HTTP 401
+- 1 test executed
+- 1 passed
+- 0 failed
+- exit code 0
+
+The full Phase 5 authentication suite was also re-run and confirmed:
+
+```text
+docs/evidence/phase5-auth/auth-suite-final.log
+7/7 passed
+```
+
+Transparency note: during finalization one transient failure of Test C was observed
+(`created.state` undefined — a non-200/409 response shape) in a single back-to-back
+wrapper run, and a transient Supabase pooler advisory-lock timeout (Prisma P1002)
+was seen during migration. Neither reproduced across five subsequent independent
+runs (Test C isolated; fresh full suite x2; sequential double-run; authoritative
+`auth-suite-final.log`), all of which are 7/7. Recorded as a non-reproducible
+infrastructure/transient observation, not an implementation defect. No source code
+was changed during this addendum.
+
 ## 5. Scope
 
 - **CP-SAT solver untouched** — `seatlabel.py`, `solver.py`, `graph.py`, `partition.py`,
