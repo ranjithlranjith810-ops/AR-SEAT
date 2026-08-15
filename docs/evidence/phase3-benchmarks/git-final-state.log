@@ -1,5 +1,5 @@
-PHASE 3 MILESTONE 3 EVIDENCE CLOSE-OUT - INITIAL PROVENANCE CAPTURE
-CAPTURED: 2026-08-15T10:41:32.4337156+05:30
+PHASE 3 MILESTONE 3 EVIDENCE CLOSE-OUT - FINAL POST-COMMIT STATE (FRESH CAPTURE)
+CAPTURED: 2026-08-15T10:43:05.7165414+05:30
 === git status ===
 On branch main
 Your branch is up to date with 'origin/main'.
@@ -11,18 +11,16 @@ Untracked files:
 
 nothing added to commit but untracked files present (use "git add" to track)
 
-=== git log --oneline -5 ===
+=== git log --oneline -3 ===
+146fa1d docs: evidence close-out - commit provenance, 2000 timing and cpu reconciliation
 7411c1f docs: close out milestone 3 - 2000 checkpoint, objective reporting spec
 8a545ff bench: validate 1000-student cpsat production path
-425c7a7 docs: finalize phase 3 solver benchmark configuration
-e130092 feat: solver service with 500-student oracle validation and encoding benchmark
-db61f73 docs: approve phase 3 cpsat solver specification
 
 === git branch -vv ===
-* main 7411c1f [origin/main] docs: close out milestone 3 - 2000 checkpoint, objective reporting spec
+* main 146fa1d [origin/main] docs: evidence close-out - commit provenance, 2000 timing and cpu reconciliation
 
 === git rev-parse HEAD ===
-7411c1fa9c60d861816c1737a144c36248bf58bf
+146fa1d9d66b81a75be91486d12125005a9e88b5
 
 === git rev-parse origin/main ===
-7411c1fa9c60d861816c1737a144c36248bf58bf
+146fa1d9d66b81a75be91486d12125005a9e88b5
