@@ -29,3 +29,40 @@ TIMESTAMP: 2026-08-15T10:32:55.0775263+05:30
 pytest -q: 46 passed, 1 warning (solver-service)
 npm test: 85 passed / 3 skipped, 12 files passed / 1 skipped (frozen Phase 2 baseline matched; storage-integration 3 skipped)
 Phase 2 protection: PASS (no tracked diffs under prisma/ or src/ - see git-diff-name-only.log)
+
+POST-COMMIT PROVENANCE
+----------------------
+TIMESTAMP: 2026-08-15T10:42:14.5841535+05:30
+COMMIT_STATUS: VERIFIED (git show 7411c1f succeeds; git log --oneline -5 shows 7411c1f at top; see git-7411c1f-content.log)
+PUSH_STATUS: VERIFIED (git branch -vv: main 7411c1f [origin/main]; git rev-parse HEAD == git rev-parse origin/main == 7411c1f; see git-final-state.log)
+HEAD: 7411c1fa9c60d861816c1737a144c36248bf58bf
+ORIGIN_MAIN: 7411c1fa9c60d861816c1737a144c36248bf58bf
+NOTE: the pre-commit captures committed inside 7411c1f (git-status.log / git-diff-stat.log / git-diff-name-only.log / git-log.log / phase3-spec-diff.log, captured 10:25-10:34) show HEAD=8a545ff and are HISTORICAL pre-commit evidence; they are superseded for provenance purposes by git-final-state.log (fresh post-commit capture).
+COMMIT CONTENTS: verified - 7411c1f contains Revision 6 spec changes, phase3-benchmarks.md 2000 section, benchmark_2000.py, dataset.py 2000 dataset, checkpoint/evidence logs (13 files, +702/-89; see git-7411c1f-content.log). No source files outside benchmark/docs.
+
+2,000 TIMING
+------------
+MODEL_BUILD_DURATION_MS: NOT_INSTRUMENTED (build_stage1 is invoked twice - once by the runner for counts, once inside solve_request - and neither build is separately timed)
+SOLVE_DURATION_MS: NOT_SEPARATELY_CAPTURED (solver.WallTime() not captured; log_search_progress=False so no CP-SAT wall-time/phase log)
+TOTAL_DURATION_MS: 243986 (measured in benchmark_2000.py via time.perf_counter() window around solver.solve_request; recorded in 2000-production-8w.log)
+SOLVER_BUDGET_MS: 180000 exactly (max_time_in_seconds = request.timeLimitSeconds = 180)
+APPROX_NON_SOLVE_TIME_MS: 63986 (ESTIMATE, not a measurement: TOTAL_DURATION_MS 243986 - SOLVER_BUDGET_MS 180000; conditioned on the inference that CP-SAT exhausted its full 180 s budget because status=ERROR (UNKNOWN, no feasible solution) - the standard CP-SAT behavior is to stop at the time limit)
+TIMING_SOURCE: 2000-production-8w.log + benchmark_2000.py (lines: built=build_stage1 for counts; t0 before solve_request; duration_ms after)
+TIMING_LIMITATION: build #1 (runner, for var/const counts) is NOT included in TOTAL_DURATION_MS; build #2 (inside solve_request) IS included. TOTAL_DURATION_MS therefore = internal model construction + solve + response assembly.
+
+2,000 CPU
+---------
+CPU_PEAK_2000: 104.0% (process-wide, % of one core; 100% = one full core, 800% = eight cores)
+CPU_PEAK_1000: 727.0% (same instrumentation in benchmark_1000.py)
+CPU_MEASUREMENT_METHOD: psutil.Process().cpu_percent(interval=None) called every ~0.5 s in a sampler thread; returns process-wide CPU since the previous sample (across all threads/cores); peak over the sampled window
+CPU_COVERAGE: the sampled window brackets solve_request (model construction + CP-SAT solve + response assembly); it does NOT cover the runner's separate build_stage1 (before sampler.start())
+CPU_SCALING_EXPLANATION: PARTIALLY EXPLAINED - num_search_workers=8 configures worker threads but does not force process CPU; single-threaded phases legitimately read ~100%. The 2000 run never exceeded ~1 core at any sampled instant, consistent with its 243,986 ms window being dominated by single-threaded model construction and CP-SAT presolve/root without sustained parallel search engaging (vs 1000's 727.0%, which reflects active multi-core search producing a FEASIBLE solution). Because log_search_progress=False, CP-SAT's internal phase/worker activity is NOT in the evidence, so the precise phase split (which phase dominated the budget) is UNRESOLVED. The CPU difference is NOT treated as evidence of a solver defect and NO solver configuration was modified.
+
+EVIDENCE LIMITATIONS
+--------------------
+1. No separate model-build / solve timestamps exist; SOLVE_DURATION_MS and MODEL_BUILD_DURATION_MS are NOT_INSTRUMENTED / NOT_SEPARATELY_CAPTURED.
+2. APPROX_NON_SOLVE_TIME_MS = 63986 is an ESTIMATE derived by arithmetic, not a measured value, and depends on the inference that CP-SAT exhausted its 180 s budget.
+3. CP-SAT internal phase timing and worker activity were not logged (log_search_progress=False).
+4. CPU scaling explanation is PARTIALLY EXPLAINED; the internal cause of single-threaded dominance is UNRESOLVED.
+5. 1000-vs-2000 memory (4518.9 MB vs 5541.5 MB) is NOT a clean scaling comparison: different datasets, hall counts, time limits, and window definitions (1000 window excludes its own build; both include an internal build).
+6. Pre-commit git captures in 7411c1f are historical (HEAD=8a545ff at capture time) and are superseded by git-final-state.log.
