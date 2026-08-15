@@ -1,10 +1,17 @@
 /**
- * Phase 4 — minimal HTTP API surface (§16).
+ * Phase 4 — minimal HTTP API surface (§16) with Phase 5 authentication.
  *
- * Three endpoints over node:http (no framework dependency):
- *   POST /exam-seating/generations          -> 202 { generationId, state, pollUrl }
- *   GET  /exam-seating/generations/:id      -> generation state + domain states
- *   GET  /exam-seating/generations/:id/seating -> published seating grouped by hall
+ * Endpoints over node:http (no framework dependency):
+ *   POST /auth/login                                -> 200 { user } + session cookie
+ *   POST /auth/logout                               -> 200 { ok } + expired cookie
+ *   GET  /auth/me                                   -> 200 { user } (authenticated)
+ *   POST /exam-seating/generations                  -> 202 { generationId, state, pollUrl } (ADMIN)
+ *   GET  /exam-seating/generations/:id              -> generation state + domain states
+ *   GET  /exam-seating/generations/:id/seating      -> published seating grouped by hall
+ *
+ * Authentication/session validation/role authorization run BEFORE routing, so
+ * an unauthenticated request never reaches candidate processing, partitioning,
+ * CP-SAT dispatch, or persistence.
  *
  * The in-memory registry is the generation state source of truth for the
  * polling surface; the authoritative record is the SolveJob + SeatingPlan row.
@@ -16,6 +23,21 @@ import type {
 } from "./types";
 import { runSeatingGeneration } from "./integration";
 import { getSeatingPlanForExam } from "./persist";
+import {
+  AuthError,
+  requireAdmin,
+  requireAuth,
+} from "./auth/guards";
+import {
+  DEFAULT_SESSION_TTL_SECONDS,
+  expiredSessionCookieHeader,
+  readSessionToken,
+  resolveSession,
+  sessionCookieHeader,
+  destroySession,
+  createSession,
+} from "./auth/session";
+import { publicUser, verifyCredentials } from "./auth/users";
 
 export interface Phase4ApiOptions extends GenerateOptions {
   registry: GenerationRegistry;
@@ -41,13 +63,33 @@ async function handleRequest(
     const path = url.pathname;
     const method = req.method ?? "GET";
 
+    // Public authentication endpoints.
+    if (method === "POST" && path === "/auth/login") {
+      await handleLogin(req, res);
+      return;
+    }
+    if (method === "POST" && path === "/auth/logout") {
+      await handleLogout(req, res);
+      return;
+    }
+
+    // Everything below requires a valid session.
+    const user = (await resolveSession(readSessionToken(req)))?.user ?? null;
+
+    if (method === "GET" && path === "/auth/me") {
+      json(res, 200, { user: publicUser(requireAuth(user)) });
+      return;
+    }
+
     if (method === "POST" && path === "/exam-seating/generations") {
-      await handleCreateGeneration(req, res, options);
+      const actor = requireAdmin(user);
+      await handleCreateGeneration(req, res, options, actor.id);
       return;
     }
 
     const generationMatch = path.match(/^\/exam-seating\/generations\/([^/]+)$/);
     if (method === "GET" && generationMatch) {
+      requireAuth(user);
       const generationId = generationMatch[1]!;
       const result = options.registry.get(generationId);
       if (!result) {
@@ -60,6 +102,7 @@ async function handleRequest(
 
     const seatingMatch = path.match(/^\/exam-seating\/generations\/([^/]+)\/seating$/);
     if (method === "GET" && seatingMatch) {
+      requireAuth(user);
       const generationId = seatingMatch[1]!;
       const result = options.registry.get(generationId);
       if (!result) {
@@ -73,15 +116,60 @@ async function handleRequest(
 
     json(res, 404, { error: "NOT_FOUND", message: `no route for ${method} ${path}` });
   } catch (error) {
+    if (error instanceof AuthError) {
+      json(res, error.status, { error: error.code, message: error.message });
+      return;
+    }
     const message = error instanceof Error ? error.message : String(error);
     json(res, 500, { error: "INTERNAL_ERROR", message });
   }
+}
+
+async function handleLogin(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+) {
+  const body = await readBody(req);
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(body) as Record<string, unknown>;
+  } catch {
+    json(res, 400, { error: "INVALID_JSON", message: "request body must be JSON" });
+    return;
+  }
+  const username = parsed.username;
+  const password = parsed.password;
+  if (typeof username !== "string" || typeof password !== "string") {
+    json(res, 400, { error: "MISSING_CREDENTIALS", message: "username and password are required" });
+    return;
+  }
+  const user = await verifyCredentials(username, password);
+  if (!user) {
+    json(res, 401, { error: "INVALID_CREDENTIALS", message: "invalid username or password" });
+    return;
+  }
+  const { token } = await createSession(user.id);
+  json(
+    res,
+    200,
+    { user: publicUser(user) },
+    { "Set-Cookie": sessionCookieHeader(token, DEFAULT_SESSION_TTL_SECONDS) },
+  );
+}
+
+async function handleLogout(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+) {
+  await destroySession(readSessionToken(req));
+  json(res, 200, { ok: true }, { "Set-Cookie": expiredSessionCookieHeader() });
 }
 
 async function handleCreateGeneration(
   req: import("node:http").IncomingMessage,
   res: import("node:http").ServerResponse,
   options: Phase4ApiOptions,
+  actorId: string,
 ) {
   const body = await readBody(req);
   let parsed: Record<string, unknown>;
@@ -100,7 +188,7 @@ async function handleCreateGeneration(
 
   const run = await runSeatingGeneration({
     examId,
-    requestedBy: options.requestedBy ?? "api",
+    requestedBy: actorId,
     timeLimitSeconds:
       typeof parsed.timeLimitSeconds === "number" ? parsed.timeLimitSeconds : options.timeLimitSeconds,
     maxParallelDomains:
@@ -166,11 +254,17 @@ function serializeSeating(plan: unknown) {
   return { plan };
 }
 
-function json(res: import("node:http").ServerResponse, status: number, payload: unknown) {
+function json(
+  res: import("node:http").ServerResponse,
+  status: number,
+  payload: unknown,
+  extraHeaders?: Record<string, string>,
+) {
   const body = JSON.stringify(payload);
   res.writeHead(status, {
     "Content-Type": "application/json",
     "Content-Length": Buffer.byteLength(body),
+    ...extraHeaders,
   });
   res.end(body);
 }

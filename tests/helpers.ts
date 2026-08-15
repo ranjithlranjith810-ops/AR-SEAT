@@ -2,6 +2,8 @@ import { expect } from "vitest";
 import { PrismaClient } from "@prisma/client";
 
 const TABLES = [
+  '"auth_sessions"',
+  '"users"',
   '"audit_logs"',
   '"seat_assignments"',
   '"seating_plans"',
