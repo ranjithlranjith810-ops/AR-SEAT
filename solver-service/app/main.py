@@ -64,13 +64,18 @@ async def solve(req: SolveRequest, request: Request) -> dict:
 
 
 @app.post("/solve-domain")
-async def solve_domain(req: SolveRequest, request: Request) -> dict:
+def solve_domain(req: SolveRequest, request: Request) -> dict:
     """Phase 4 orchestration endpoint — solve ONE physical domain per request.
 
     Calls the frozen seat-label engine (seatlabel.solve_domain), which requires
     the request to span exactly one connected component of the physical seat
     graph (splitting components is the Node orchestrator's job, §11.1). No
     solver formulation/partition/guard logic is touched here.
+
+    SYNC (def, not async): FastAPI runs synchronous endpoints in a threadpool,
+    so the blocking CP-SAT solve no longer occupies the asyncio event loop and
+    concurrent /solve-domain requests can execute in parallel. Execution-model
+    change only; the frozen engine is unchanged.
     """
     token = request.headers.get("X-Internal-Token")
     if not settings.verify_token(token):
