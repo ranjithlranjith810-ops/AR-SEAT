@@ -24,9 +24,11 @@ from .validation import (
     INSUFFICIENT_SEATS,
     INTERNAL_ERROR,
     NO_FEASIBLE_ASSIGNMENT,
+    OPTIMAL,
     SOLVER_TIMEOUT_NO_SOLUTION,
     build_response,
     classify_status,
+    compute_validation_report,
 )
 
 ENCODING_D = "D"
@@ -195,9 +197,17 @@ def solve_request(request: SolveRequest, settings) -> SolveResponse:
             error_message="timed out with no solution; infeasibility unproven",
         )
 
-    objective_value = int(round(solver.ObjectiveValue()))
     pattern = extract_pattern(solver, z, len(seats), len(keys), keys)
     assignments = assign_candidates(request, seats, pattern)
+
+    if status_label == OPTIMAL:
+        # objective is tight for proven-optimal solutions
+        objective_value = int(round(solver.ObjectiveValue()))
+    else:
+        # FEASIBLE (timeout): o[e] is only lower-bounded, so solver.ObjectiveValue()
+        # may be inflated on non-same-department edges; report the true objective of
+        # the returned assignment (§29 pairwise count).
+        objective_value = compute_validation_report(request, assignments)["sameDepartmentAdjacentCount"]
     return build_response(request, status_label, assignments, duration_ms, objective_value)
 
 

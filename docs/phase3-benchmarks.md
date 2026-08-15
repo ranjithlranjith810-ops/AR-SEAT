@@ -1,8 +1,8 @@
-# Phase 3 — CP-SAT Solver Benchmarks: 500-Student Validation & Encoding Comparison
+# Phase 3 — CP-SAT Solver Benchmarks: 500-Student Validation & 1000-Student Production-Path Gate
 
-Status: PHASE 3 MILESTONE 2 — COMPLETE / VERIFIED
+Status: PHASE 3 MILESTONE 2 — COMPLETE / VERIFIED; MILESTONE 3 — VALID FEASIBLE RESULT / OPTIMALITY NOT PROVEN
 Author: (automated benchmark evidence)
-Date: 2026-08-14
+Date: 2026-08-15
 Spec: `docs/phase3-cpsat-spec.md` Revision 5
 
 ## 1. Purpose
@@ -146,3 +146,56 @@ benchmark/research alternative only.
 ## 11. Milestone status
 
 PHASE 3 MILESTONE 2 — COMPLETE / VERIFIED. See milestone report.
+
+## 12. 1000-student production-path gate (Milestone 3)
+
+Production path only (Approach C, Encoding D); the dense oracle (Approach A) is
+**not** run at 1000 (spec §6.4 requires the oracle only at 100/500). Config
+(spec §12/§25): `num_search_workers=8`, `random_seed=42`, `hardRuleScope=class`,
+8-neighbourhood, `timeLimitSeconds=120`. Dataset: 1,000 candidates, 1,000 seats,
+10 halls (5 rows × 20 columns), 200 classes (10 departments × suffixes A–T),
+5 students/class, 100 students/department.
+
+| Metric | Value |
+|---|---|
+| Status | FEASIBLE (120 s limit; optimality not proven) |
+| objectiveValue | 272 (= measured sameDepartmentAdjacentCount) |
+| solverDurationMs | 139,734 |
+| Peak RSS | 4,518.9 MB (PRODUCTION-PATH) |
+| Peak CPU | 727.0% |
+| Variables / Constraints | 203,270 / 233,900 |
+| assigned / unassigned | 1,000 / 0 |
+| sameClassAdjacent / sameDepartmentAdjacent | 0 / 272 |
+| requiredZeros / structuralErrors | true / [] |
+
+**PHASE 3 MILESTONE 3 — VALID FEASIBLE RESULT / OPTIMALITY NOT PROVEN.**
+(Evidence: `1000-production-8w-fixed.log`, EXIT CODE: 0.)
+
+### 12.1 Defect discovered and owner-approved fix
+
+The first 1000 run reported `objectiveValue=488` while the measured
+same-department adjacency was **264**. Root cause: the objective variable `o[e]`
+is only **lower-bounded** (`o[e] >= w_a + w_b - 1`); in a FEASIBLE (timeout)
+solution CP-SAT may leave `o[e]=1` on non-same-department edges, inflating
+`solver.ObjectiveValue()`. The bound is tight at OPTIMAL, which is why this never
+surfaced at 100/500 (both OPTIMAL). Verified independently by
+`solver-service/benchmarks/diagnose_1000.py`: three independent counts
+(z-derived, validator, pattern recompute) all agreed on 323 while
+`ObjectiveValue()` reported 1335.
+
+Owner-approved **reporting-only fix** (no model change): for FEASIBLE responses,
+`solve_request` now reports the objective recomputed from the returned
+assignment (§29 pairwise `sameDepartmentAdjacentCount`) instead of
+`solver.ObjectiveValue()`; OPTIMAL reporting is unchanged. Re-run: objective
+272 == sameDepartmentAdjacentCount 272, valid=True, EXIT CODE: 0.
+
+## 13. Evidence (1000-student gate)
+
+- `docs/evidence/phase3-benchmarks/1000-production-8w-fixed.log` — 1000
+  production gate (Approach C, 8 workers, 120 s) — EXIT CODE: 0.
+- `docs/evidence/phase3-benchmarks/1000-checkpoint.log` — on-disk checkpoint,
+  incl. defect finding and regression records.
+- `docs/evidence/phase3-benchmarks/npm-test.log` — Phase 2 regression
+  (85 passed / 3 skipped, 12 files passed / 1 skipped).
+- Regression: `pytest -q` 46 passed (solver-service); Phase 2 protection: no
+  tracked diffs under `prisma/`, `src/`.

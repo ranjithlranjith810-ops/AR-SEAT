@@ -1,0 +1,21 @@
+=== PHASE 3 MILESTONE 3 — 1000-STUDENT PRODUCTION-PATH BENCHMARK ===
+distribution: {"candidateCount": 1000, "hallCount": 10, "seatCount": 1000, "classCount": 200, "departmentCount": 10, "studentsPerClass": 5, "studentsPerDepartment": 100, "rowsPerHall": 5, "columnsPerHall": 20}
+config: Approach=C Encoding=D num_search_workers=8 random_seed=42 hardRuleScope=class adjacency=8-neighbourhood timeLimitSeconds=120
+
+status=FEASIBLE
+objectiveValue=488
+solverDurationMs=140253
+memoryPeak=4450.8 MB
+cpuPeak=713.3%
+variableCount=203270
+constraintCount=233900
+assignedCount=1000
+unassignedCount=0
+
+validation={"candidateCount": 1000, "assignedCount": 1000, "unassignedCount": 0, "duplicateCandidateCount": 0, "duplicateSeatCount": 0, "sameClassAdjacentCount": 0, "sameDepartmentAdjacentCount": 264, "hallsUsed": 10}
+requiredZeros=True
+structuralErrors=[]
+objective==sameDepartmentAdjacentCount=False
+valid=False
+
+BENCHMARK = UNEXPECTED (status=FEASIBLE valid=False)

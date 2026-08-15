@@ -1,0 +1,41 @@
+CHECKPOINT 0
+TIMESTAMP: 2026-08-15T09:07:42.3668609+05:30
+STATUS: COMPLETE
+DESCRIPTION: baseline verified - branch main, HEAD 425c7a7, origin/main 425c7a7, Phase 2 untouched, prod config (8 workers/seed42/class/EncodingD/8-neighbourhood) confirmed
+
+CHECKPOINT 1
+TIMESTAMP: 2026-08-15T09:07:42.3698587+05:30
+STATUS: COMPLETE
+DESCRIPTION: dataset verified - 1000 candidates, 1000 seats, 10 halls (5x20), 200 classes, 10 departments, 5/class, 100/dept
+
+CHECKPOINT 2
+TIMESTAMP: 2026-08-15T09:07:42.3698587+05:30
+STATUS: COMPLETE
+DESCRIPTION: benchmark configuration verified - Approach=C Encoding=D workers=8 seed=42 hardRuleScope=class 8-neighbourhood timeLimitSeconds=120; runner benchmark_1000.py smoke-tested
+CHECKPOINT 3
+TIMESTAMP: 2026-08-15T09:07:47.9351095+05:30
+STATUS: COMPLETE
+DESCRIPTION: benchmark started - python benchmarks\benchmark_1000.py --time-limit 120 (official 120s production run)
+
+STATUS: BLOCKED - DEFECT FOUND (not a benchmark failure; solver defect)
+TIMESTAMP: 2026-08-15T09:27:16.7755261+05:30
+CHECKPOINT 3 (benchmark started) - COMPLETE (run executed, log captured)
+CHECKPOINT 4 (benchmark completed) - COMPLETE (status=FEASIBLE objective=488 assigned=1000 valid-per-hard-constraints)
+CHECKPOINT 5 (validation completed) - COMPLETE but FAILED consistency: objectiveValue(488) != sameDepartmentAdjacentCount(264)
+DEFECT: objective variable o[e] only lower-bounded (o[e] >= w_a+w_b-1); in FEASIBLE/timeout solutions CP-SAT leaves o[e]=1 on non-same-dept edges, inflating reported objectiveValue. Diagnostic run: ObjectiveValue()=1335 vs actual same-dept edges=323. Verified via diagnose_1000.py (objectiveValue == sum(Value(o[e])) == 1335 != z-derived count == validator count == pattern count == 323).
+Action per milestone STOP conditions: halted, not silently fixing solver. Awaiting owner decision on objective tightening/reporting fix before re-running 1000 gate.
+
+REGRESSION (run while blocked):
+TIMESTAMP: 2026-08-15T09:44:55.9613314+05:30
+pytest -q: 46 passed, 1 warning (solver-service)
+npm test: 85 passed / 3 skipped, 12 files passed / 1 skipped (Phase 2 baseline matched; storage-integration 3 skipped as frozen)
+Phase 2 protection: PASS (no tracked Phase 2/prisma/src diffs)
+
+FINAL STATUS: PHASE 3 MILESTONE 3 - BLOCKED / FAILED (solver objectiveValue defect for FEASIBLE results)
+No commit made. Working tree contains M3 benchmark scaffolding + evidence, uncommitted, awaiting owner decision on the defect fix.
+
+OWNER DECISION: reporting-only fix approved (no model change).
+Fix: solver.solve_request now reports objectiveValue = compute_validation_report(...)["sameDepartmentAdjacentCount"] for FEASIBLE responses (OPTIMAL unchanged).
+pytest after fix: 46 passed.
+GATE RE-RUN (1000-production-8w-fixed.log): status=FEASIBLE objectiveValue=272 sameDepartmentAdjacentCount=272 requiredZeros=True structuralErrors=[] valid=True solverDurationMs=139734 memoryPeak=4518.9 MB cpuPeak=727.0% vars=203270 cons=233900 EXIT CODE: 0
+RESULT: PHASE 3 MILESTONE 3 - VALID FEASIBLE RESULT / OPTIMALITY NOT PROVEN
