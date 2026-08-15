@@ -11,7 +11,7 @@ import {
   validateMerge,
 } from "../src/phase4/validateMerge";
 import { mapWithConcurrency } from "../src/phase4/workerPool";
-import { solveDomain } from "../src/phase4/solverClient";
+import { solveDomain, resolveSolverToken } from "../src/phase4/solverClient";
 import { runGeneration } from "../src/phase4/generation.service";
 import type { DomainSolveResult, SolverDispatch } from "../src/phase4/types";
 import { generateProforma1, buildProformaInput } from "../src/phase4/proforma";
@@ -414,6 +414,85 @@ describe("phase4 solver client", () => {
       expect(result.validatorObjective).toBe(0);
     } finally {
       server.close();
+    }
+  });
+
+  it("sends the configured X-Internal-Token header on every request", async () => {
+    const previous = process.env.SOLVER_INTERNAL_TOKEN;
+    process.env.SOLVER_INTERNAL_TOKEN = "test-internal-token";
+    let seenHeader: string | undefined;
+    const server = createServer((req, res) => {
+      let body = "";
+      req.on("data", (chunk) => (body += chunk));
+      req.on("end", () => {
+        seenHeader = req.headers["x-internal-token"] as string | undefined;
+        const payload = JSON.parse(body) as { requestId: string };
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            requestId: payload.requestId,
+            status: "OPTIMAL",
+            assignments: [],
+            solverDurationMs: 1,
+            candidateCount: 0,
+            assignedCount: 0,
+            unassignedCount: 0,
+            objectiveValue: 0,
+          }),
+        );
+      });
+    });
+    try {
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+      const address = server.address();
+      const port = typeof address === "object" && address ? address.port : 0;
+      const result = await solveDomain(
+        {
+          requestId: "gen:1:D-1",
+          examId: "exam-1",
+          candidates: [],
+          halls: [makeHall(1)],
+          timeLimitSeconds: 5,
+          solverConfig: {
+            policyMode: "DEPARTMENT_ONLY",
+            adjacency: "eight",
+            compositionAction: "warn",
+            randomSeed: 0,
+            numSearchWorkers: null,
+          },
+          candidateCount: 0,
+          availableSeatCount: 25,
+        },
+        { baseUrl: `http://127.0.0.1:${port}` },
+      );
+      expect(result.status).toBe("OPTIMAL");
+      expect(seenHeader).toBe("test-internal-token");
+    } finally {
+      server.close();
+      if (previous === undefined) delete process.env.SOLVER_INTERNAL_TOKEN;
+      else process.env.SOLVER_INTERNAL_TOKEN = previous;
+    }
+  });
+
+  it("refuses to call the solver when SOLVER_INTERNAL_TOKEN is unset", () => {
+    const previous = process.env.SOLVER_INTERNAL_TOKEN;
+    delete process.env.SOLVER_INTERNAL_TOKEN;
+    try {
+      expect(() => resolveSolverToken()).toThrow(/SOLVER_INTERNAL_TOKEN is not set/);
+    } finally {
+      if (previous === undefined) delete process.env.SOLVER_INTERNAL_TOKEN;
+      else process.env.SOLVER_INTERNAL_TOKEN = previous;
+    }
+  });
+
+  it("refuses to call the solver with the known dev-default token", () => {
+    const previous = process.env.SOLVER_INTERNAL_TOKEN;
+    process.env.SOLVER_INTERNAL_TOKEN = "dev-internal-token";
+    try {
+      expect(() => resolveSolverToken()).toThrow(/must not be the known default/);
+    } finally {
+      if (previous === undefined) delete process.env.SOLVER_INTERNAL_TOKEN;
+      else process.env.SOLVER_INTERNAL_TOKEN = previous;
     }
   });
 

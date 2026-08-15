@@ -49,6 +49,64 @@ def test_solve_domain_missing_token_is_401(client):
     assert resp.status_code == 401
 
 
+def test_solve_domain_wrong_token_is_401(client):
+    hall = make_hall("h1", "LH09", 2, 2)
+    body = make_request([make_candidate(1, "CSE-A", "CSE")], [hall])
+    resp = client.post("/solve-domain", json=body, headers={"X-Internal-Token": "wrong"})
+    assert resp.status_code == 401
+
+
+def test_solve_domain_dev_default_token_rejected(client, monkeypatch):
+    """TB3 fail-closed: even a CORRECT match against the well-known default
+    token must be rejected — the server refuses to run with that secret."""
+    import app.main as main_mod
+
+    monkeypatch.setattr(main_mod.settings, "internal_token", "dev-internal-token")
+    hall = make_hall("h1", "LH09", 2, 2)
+    body = make_request([make_candidate(1, "CSE-A", "CSE")], [hall])
+    resp = client.post(
+        "/solve-domain",
+        json=body,
+        headers={"X-Internal-Token": "dev-internal-token"},
+    )
+    assert resp.status_code == 401
+
+
+def test_solve_domain_blank_config_rejected(client, monkeypatch):
+    """TB3 fail-closed: a server configured with a blank token accepts nothing."""
+    import app.main as main_mod
+
+    monkeypatch.setattr(main_mod.settings, "internal_token", "")
+    hall = make_hall("h1", "LH09", 2, 2)
+    body = make_request([make_candidate(1, "CSE-A", "CSE")], [hall])
+    resp = client.post("/solve-domain", json=body, headers={"X-Internal-Token": ""})
+    assert resp.status_code == 401
+
+
+def test_invalid_token_rejected_before_payload_validation(client, monkeypatch):
+    """TB3 auth-order: a bad token must yield 401 (NOT 422) even with a
+    malformed body, and the solver must never be invoked — the request stops
+    at the shared authentication dependency."""
+    import app.main as main_mod
+
+    invoked: list[str] = []
+    monkeypatch.setattr(
+        main_mod.seatlabel,
+        "solve_domain",
+        lambda *a, **k: invoked.append("called") or {},
+    )
+    body = {
+        "requestId": "x",
+        "examId": "y",
+        "candidates": [{"id": "c1", "department": "CSE"}],
+        "halls": {},
+    }
+    resp = client.post("/solve-domain", json=body, headers={"X-Internal-Token": "wrong"})
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "unauthorized"}
+    assert invoked == []
+
+
 def test_solve_domain_capacity_exceeded_is_422(client, headers):
     hall = make_hall("h1", "LH09", 1, 1)
     body = make_request(

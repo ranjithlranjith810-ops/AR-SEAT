@@ -39,6 +39,57 @@ def test_wrong_token_is_401(client):
     assert resp.status_code == 401
 
 
+def test_dev_default_token_rejected(client, monkeypatch):
+    """TB3 fail-closed: even a correct match against the well-known default
+    token is rejected — the server refuses to run with that secret."""
+    import app.main as main_mod
+
+    monkeypatch.setattr(main_mod.settings, "internal_token", "dev-internal-token")
+    hall = make_hall("h1", "LH09", 3, 3)
+    body = make_request([make_candidate(1, "CSE-A", "CSE")], [hall])
+    resp = client.post(
+        "/solve",
+        json=body,
+        headers={"X-Internal-Token": "dev-internal-token"},
+    )
+    assert resp.status_code == 401
+
+
+def test_blank_config_rejected(client, monkeypatch):
+    """TB3 fail-closed: a server configured with a blank token accepts nothing."""
+    import app.main as main_mod
+
+    monkeypatch.setattr(main_mod.settings, "internal_token", "")
+    hall = make_hall("h1", "LH09", 3, 3)
+    body = make_request([make_candidate(1, "CSE-A", "CSE")], [hall])
+    resp = client.post("/solve", json=body, headers={"X-Internal-Token": ""})
+    assert resp.status_code == 401
+
+
+def test_invalid_token_rejected_before_payload_validation(client, monkeypatch):
+    """TB3 auth-order: /solve shares the same authentication dependency, so a
+    bad token must yield 401 (NOT 422) even with a malformed body, and the
+    solver must never be invoked."""
+    import app.main as main_mod
+
+    invoked: list[str] = []
+    monkeypatch.setattr(
+        main_mod.solver,
+        "solve_request",
+        lambda *a, **k: invoked.append("called") or {},
+    )
+    body = {
+        "requestId": "x",
+        "examId": "y",
+        "candidates": [{"id": "c1", "department": "CSE"}],
+        "halls": {},
+    }
+    resp = client.post("/solve", json=body, headers={"X-Internal-Token": "wrong"})
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "unauthorized"}
+    assert invoked == []
+
+
 def test_empty_halls_is_422(client, headers):
     body = make_request([make_candidate(1, "CSE-A", "CSE")], [])
     resp = client.post("/solve", json=body, headers=headers)

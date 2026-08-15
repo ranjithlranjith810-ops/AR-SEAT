@@ -1,15 +1,18 @@
 """FastAPI app — stateless internal solver service.
 
-- GET /health
-- POST /solve  (X-Internal-Token, pydantic 422, payload 413, timeout per §16)
+- GET /health            (open liveness probe, no solver data exposed)
+- POST /solve            (X-Internal-Token via shared dependency, pydantic 422, payload 413, timeout per §16)
+- POST /solve-domain     (X-Internal-Token via shared dependency, pydantic 422, payload 413, timeout per §16)
 
-The service never connects to a database and holds no credentials.
+Every route that performs or exposes solver work is guarded by the single shared
+require_internal_token dependency. The service never connects to a database and
+holds no credentials. Trust boundary is fail-closed (see config.py).
 """
 from __future__ import annotations
 
 import logging
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from . import seatlabel, solver
@@ -22,6 +25,12 @@ logger = logging.getLogger("solver")
 settings = get_settings()
 
 app = FastAPI(title="AR-SEAT CP-SAT Solver", docs_url=None, redoc_url=None, openapi_url=None)
+
+
+def require_internal_token(request: Request) -> None:
+    """Reject any request without a valid configured X-Internal-Token (401)."""
+    if not settings.verify_token(request.headers.get("X-Internal-Token")):
+        raise HTTPException(status_code=401, detail="unauthorized")
 
 
 @app.middleware("http")
@@ -38,12 +47,8 @@ async def health():
     return {"status": "ok"}
 
 
-@app.post("/solve")
-async def solve(req: SolveRequest, request: Request) -> dict:
-    token = request.headers.get("X-Internal-Token")
-    if not settings.verify_token(token):
-        raise HTTPException(status_code=401, detail="unauthorized")
-
+@app.post("/solve", dependencies=[Depends(require_internal_token)])
+async def solve(req: SolveRequest) -> dict:
     total_seats = sum(len(h.seats) for h in req.halls)
     if len(req.candidates) > total_seats:
         raise HTTPException(status_code=422, detail="candidateCount > availableSeatCount")
@@ -63,8 +68,8 @@ async def solve(req: SolveRequest, request: Request) -> dict:
     return resp.model_dump()
 
 
-@app.post("/solve-domain")
-def solve_domain(req: SolveRequest, request: Request) -> dict:
+@app.post("/solve-domain", dependencies=[Depends(require_internal_token)])
+def solve_domain(req: SolveRequest) -> dict:
     """Phase 4 orchestration endpoint — solve ONE physical domain per request.
 
     Calls the frozen seat-label engine (seatlabel.solve_domain), which requires
@@ -77,10 +82,6 @@ def solve_domain(req: SolveRequest, request: Request) -> dict:
     concurrent /solve-domain requests can execute in parallel. Execution-model
     change only; the frozen engine is unchanged.
     """
-    token = request.headers.get("X-Internal-Token")
-    if not settings.verify_token(token):
-        raise HTTPException(status_code=401, detail="unauthorized")
-
     total_seats = sum(len(h.seats) for h in req.halls)
     if len(req.candidates) > total_seats:
         raise HTTPException(status_code=422, detail="candidateCount > availableSeatCount")

@@ -28,8 +28,21 @@ export function resolveSolverBaseUrl(): string {
   return process.env.SOLVER_BASE_URL?.replace(/\/+$/, "") ?? "http://127.0.0.1:8000";
 }
 
+const KNOWN_DEFAULT_TOKEN = "dev-internal-token";
+
 export function resolveSolverToken(): string {
-  return process.env.SOLVER_INTERNAL_TOKEN ?? "dev-internal-token";
+  const token = process.env.SOLVER_INTERNAL_TOKEN;
+  if (!token || token.trim() === "") {
+    throw new Error(
+      "SOLVER_INTERNAL_TOKEN is not set; refusing to call the solver without a configured service token",
+    );
+  }
+  if (token === KNOWN_DEFAULT_TOKEN) {
+    throw new Error(
+      "SOLVER_INTERNAL_TOKEN must not be the known default 'dev-internal-token'; configure a real token",
+    );
+  }
+  return token;
 }
 
 export async function solveDomain(

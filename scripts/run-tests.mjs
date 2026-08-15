@@ -44,6 +44,7 @@ const testEnv = {
   DATABASE_URL: process.env.TEST_DATABASE_URL,
   DIRECT_URL: testDirectUrl,
   RUN_TESTS: "1",
+  SOLVER_INTERNAL_TOKEN: "test-internal-token",
 };
 
 console.log(`\n=== Test database: ${testUrl.pathname} ===\n`);

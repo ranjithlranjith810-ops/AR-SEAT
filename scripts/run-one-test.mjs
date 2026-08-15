@@ -17,6 +17,7 @@ const env = {
   DATABASE_URL: process.env.TEST_DATABASE_URL,
   DIRECT_URL: process.env.TEST_DIRECT_URL,
   RUN_TESTS: "1",
+  SOLVER_INTERNAL_TOKEN: "test-internal-token",
 };
 
 const child = spawn("npx", ["vitest", "run", target, "--no-color"], {

@@ -22,7 +22,7 @@ mkdirSync(evidenceDir, { recursive: true });
 const port = Number(process.argv[2] ?? 8000);
 const baseUrl = `http://127.0.0.1:${port}`;
 process.env.SOLVER_BASE_URL = baseUrl;
-process.env.SOLVER_INTERNAL_TOKEN = "dev-internal-token";
+process.env.SOLVER_INTERNAL_TOKEN = "benchmark-internal-token";
 
 const DEPARTMENTS = ["CSE", "ECE", "MECH", "CIVIL"] as const;
 const YEARS = ["2026", "2027"] as const;
