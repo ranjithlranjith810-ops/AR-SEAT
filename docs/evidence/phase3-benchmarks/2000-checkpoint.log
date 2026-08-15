@@ -1,0 +1,31 @@
+CHECKPOINT 0
+TIMESTAMP: 2026-08-15T10:05:00+05:30 (approx, see git evidence)
+STATUS: COMPLETE
+DESCRIPTION: baseline verified - branch main, HEAD 8a545ff, origin/main 8a545ff; M3 close-out starts from commit 8a545ff (1000 gate committed); strays docs/phase3-discovery.md and "eating prototype" untracked and untouched
+
+CHECKPOINT 1
+TIMESTAMP: 2026-08-15T10:05:30+05:30 (approx)
+STATUS: COMPLETE
+DESCRIPTION: owner-approval provenance recorded in 1000-checkpoint.log - OWNER_APPROVAL_STATUS=VERIFIED (explicit owner selection of "Reporting-only fix" in OpenCode session 2026-08-15, prior to implementation); spec updated to Revision 6 (objective-reporting rule SS5.1); 16 GB budget claim removed (none existed in docs - recorded measured fact only)
+
+CHECKPOINT 2
+TIMESTAMP: 2026-08-15T10:06:00+05:30 (approx)
+STATUS: COMPLETE
+DESCRIPTION: 2000 dataset verified - 2000 candidates, 2000 seats, 20 halls (5x20), 400 classes (10 depts x 40 suffixes A-Z,AA-AN), 5 students/class, 200 students/dept; benchmark_2000.py compiled; config Approach=C Encoding=D workers=8 seed=42 class 8-neighbourhood timeLimitSeconds<=180
+
+CHECKPOINT 3
+TIMESTAMP: 2026-08-15T10:37:00+05:30
+STATUS: COMPLETE
+DESCRIPTION: 2000 official run executed (benchmark_2000.py --time-limit 180) -> status=ERROR (SOLVER_TIMEOUT_NO_SOLUTION), variableCount=806540, constraintCount=867800, solverDurationMs=243986 (incl. model build; solve ran the full 180 s cap), memoryPeak=5541.5 MB, cpuPeak=104.0%, assignedCount=0, EXIT CODE: 2. CP-SAT returned UNKNOWN after the cap with no feasible incumbent.
+
+INTERPRETATION (recorded, not inferred):
+- TERMINATION = SOLVER_TIMEOUT (180 s cap reached, no solution, infeasibility unproven -> ERROR per spec §16). Correctly classified; the cap was NOT extended and the run was NOT restarted.
+- OBJECTIVE_REPORTING_FIX_CHECK = N/A for this run (no solution produced; the runner's literal comparison emitted FAIL only because reported=None != validator=0 with no assignments present). The fix itself is NOT regressed by this run; it remains validated by the 1000 gate (272==272). It simply could not be re-exercised at 2000.
+- This is a TRACTABILITY / SCALING finding, NOT a solver/model correctness defect: the class-scope model at 2000 (806,540 vars / 867,800 constraints) could not be solved to even feasibility within 180 s. Feasible arrangements certainly exist (each class needs only 5 pairwise-non-adjacent seats); CP-SAT's global search over the large model timed out before finding one. Consistent with spec §32/§35: class-scope (K=N/5) drives the S×K term; 4000 is estimated at ~3.2M vars and is even less tractable under any practical cap.
+- No OOM / RESOURCE_FAILURE: memoryPeak 5.5 GB on a 23.7 GB host; process exited cleanly with code 2.
+- Recommendation for 4000 (owner decision required, NOT started): class-scope single-instance 4000 is not viable within a practical time cap; investigate department-scope (§32) or per-hall decomposition (§30.5) before any 4000 attempt. Do NOT change the model without owner approval.
+REGRESSION (post-2000-run, while working tree has only benchmark/docs changes):
+TIMESTAMP: 2026-08-15T10:32:55.0775263+05:30
+pytest -q: 46 passed, 1 warning (solver-service)
+npm test: 85 passed / 3 skipped, 12 files passed / 1 skipped (frozen Phase 2 baseline matched; storage-integration 3 skipped)
+Phase 2 protection: PASS (no tracked diffs under prisma/ or src/ - see git-diff-name-only.log)

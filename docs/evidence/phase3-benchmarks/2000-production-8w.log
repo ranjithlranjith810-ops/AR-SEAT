@@ -1,0 +1,29 @@
+=== PHASE 3 MILESTONE 3 CLOSE-OUT ù 2000-STUDENT PRODUCTION-PATH CHECKPOINT ===
+distribution: {"candidateCount": 2000, "hallCount": 20, "seatCount": 2000, "classCount": 400, "departmentCount": 10, "studentsPerClass": 5, "studentsPerDepartment": 200, "rowsPerHall": 5, "columnsPerHall": 20}
+config: Approach=C Encoding=D num_search_workers=8 random_seed=42 hardRuleScope=class adjacency=8-neighbourhood timeLimitSeconds=180
+
+status=ERROR
+rawSolverObjectiveValue=None
+validatorObjectiveValue=0
+reportedObjectiveValue=None
+objectiveValueReported==validator=False
+OBJECTIVE_REPORTING_FIX_CHECK=FAIL
+termination=SOLVER_TIMEOUT (no solution, infeasibility unproven -> ERROR)
+variableCount=806540
+constraintCount=867800
+solverDurationMs=243986
+memoryPeak=5541.5 MB
+cpuPeak=104.0%
+assignedCount=0
+unassignedCount=2000
+sameClassAdjacentCount=0
+sameDepartmentAdjacentCount=0
+structuralErrors=[]
+candidateCount=2000
+seatCount=2000
+hallCount=20
+classCount=400
+departmentCount=10
+
+BENCHMARK = UNEXPECTED (status=ERROR valid=False)
+EXIT CODE: 2

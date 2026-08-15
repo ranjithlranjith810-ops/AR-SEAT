@@ -2,6 +2,7 @@
 
 > Specification only. No solver, FastAPI, Python, worker, or CP-SAT code is implemented by this document.
 > The authoritative source of the current repository state is `docs/phase3-discovery.md` and the source files it cites.
+> **Revision 6.** Revision 6 documents the objective-reporting rule for the solver response: the externally reported `objectiveValue` is always derived from the returned candidate→seat assignment, not from CP-SAT's internal `ObjectiveValue()` (§5, §11, §29). For **OPTIMAL** the two must agree; for **FEASIBLE** the raw `solver.ObjectiveValue()` may be inflated because the objective variables `o[s,t]` are only lower-bounded by the linking constraints and CP-SAT is not guaranteed to have minimized every auxiliary `o[s,t]` to its tight lower bound before a timeout — so the authoritative externally reported objective for FEASIBLE responses is `sameDepartmentAdjacentCount(returned assignment)`. This is a **reporting-only** change (owner-approved): the CP-SAT mathematical objective, Encoding D, the validator, and all frozen decisions are unchanged.
 > **Revision 5.** Revision 5 resolves the last PROPOSED V1 decision (§28 item 10): the worker-count question is answered by the 500-student benchmark — `num_search_workers` is now **8** for production (§12, §15). It also adds the production memory-sizing note distinguishing the Approach A oracle from the Approach C + Encoding D production path (§12). No mathematical section, Encoding D, hard-rule scope, or objective changes. Revision 4 (below) introduced the oracle-agreement criterion and made independent-set pre-computation optional.
 
 **Baseline:** `c7b4bc9` — `feat: complete exam document ingestion phase`
@@ -216,7 +217,7 @@ No Supabase/Postgres credentials exist anywhere in the request.
 |---|---|---|---|---|
 | `assignments` | all | best found before timeout | `[]` | `[]` |
 | `solverDurationMs` | ✓ | ✓ | ✓ | ✓ |
-| `objectiveValue` | optimal value | best found value | `null` | `null` |
+| `objectiveValue` | optimal value (validated) | recomputed from returned assignment (§5.1) | `null` | `null` |
 | `infeasibilityReason` | `null` | `null` | business reason | `null` |
 | `errorCode` | `null` | `null` | `null` | machine-readable |
 | `errorMessage` | `null` | `null` | `null` | short summary |
@@ -225,7 +226,32 @@ Rules:
 
 - `assignedCount` = `assignments.length`; `unassignedCount` = `candidateCount − assignedCount`
 - **`ERROR` and `INFEASIBLE` responses must never be persisted as a successful seating plan.**
-- `objectiveValue` = number of same-department adjacent pairs in the returned arrangement (§11).
+- `objectiveValue` = number of same-department adjacent pairs in the returned arrangement (§11), reported per the objective-reporting rule (§5.1).
+
+### 5.1 Objective-reporting rule (OPTIMAL vs FEASIBLE)
+
+The externally reported `objectiveValue` is **always** derived from the actual returned candidate→seat assignment, not from CP-SAT's internal `ObjectiveValue()`.
+
+**OPTIMAL response:**
+
+1. CP-SAT has proven global optimality.
+2. Recompute `sameDepartmentAdjacentCount` from the returned assignment (§29).
+3. The reported `objectiveValue` must agree with the validated assignment.
+4. If the solver objective and the independently recomputed objective differ: mark the result **invalid**, do **not** silently overwrite the mismatch, and do **not** claim a valid OPTIMAL result.
+
+**FEASIBLE response:**
+
+1. CP-SAT found a feasible incumbent before the time limit.
+2. Global optimality is **NOT** proven.
+3. CP-SAT's internal `ObjectiveValue()` must **NOT** be treated as the authoritative externally reported objective.
+4. Recompute `sameDepartmentAdjacentCount` from the actual returned candidate→seat assignment.
+5. Set the externally reported `objectiveValue` to that recomputed value.
+6. Preserve the raw solver objective separately in diagnostics/evidence where available.
+7. Never claim that the recomputed FEASIBLE objective is globally optimal.
+
+**Reason.** The objective variables `o[s,t]` are **lower-bounded** by the linking constraints (`o[s,t] ≥ w[s,d] + w[t,d] − 1`, §11.2). During a FEASIBLE timeout, CP-SAT is not guaranteed to have minimized every auxiliary `o[s,t]` variable to its tight lower bound before termination. Therefore `solver.ObjectiveValue()` may differ from the actual objective computed from the returned candidate→seat assignment. The authoritative externally reported objective for FEASIBLE responses is `sameDepartmentAdjacentCount(returned assignment)`.
+
+This is a **reporting-only** rule: the CP-SAT mathematical objective (§11) is unchanged and the validator (§29) is not weakened.
 
 ---
 
@@ -521,7 +547,7 @@ Properties:
 minimize  Σ_{(s,t) adjacent} o[s,t]
 ```
 
-`objectiveValue` = returned sum.
+`objectiveValue` = returned sum, reported per the objective-reporting rule (§5.1): for OPTIMAL responses it equals `solver.ObjectiveValue()` and must agree with the recomputed `sameDepartmentAdjacentCount`; for FEASIBLE responses it is recomputed from the returned assignment because CP-SAT's internal `ObjectiveValue()` may be inflated on non-same-department edges (§5.1).
 
 ### 11.2 Linking constraints (unchanged from revision 2 — confirmed correct)
 
@@ -843,7 +869,7 @@ duplicateCandidateCount = 0
 duplicateSeatCount     = 0
 ```
 
-`sameDepartmentAdjacentCount` (= `objectiveValue`) is the optimization score for comparing runs/benchmarks. Any violation of the required zeros ⇒ job `FAILED` (`INVALID_SOLVER_OUTPUT`).
+`sameDepartmentAdjacentCount` is the authoritative externally reported `objectiveValue` (see the objective-reporting rule §5.1) and is the optimization score for comparing runs/benchmarks. Any violation of the required zeros ⇒ job `FAILED` (`INVALID_SOLVER_OUTPUT`).
 
 ---
 
@@ -967,3 +993,12 @@ Only `docs/phase3-cpsat-spec.md` may change as a result of this revision. No Pyt
 3. **Memory documentation (§12):** Approach A measurements (≈3.64 GB RSS at 500) are benchmark/validation-only and must not be used for production sizing; Approach C + Encoding D (≈1.37 GB RSS at 500) is the production-path figure. Neither figure proves behavior at 4,000 / 10,000 — those need separate benchmarks.
 4. **Unchanged:** Approach C model, Encoding D, 8-neighbourhood, classSnapshot hard rule, departmentSnapshot soft objective, seed 42, global hall pool, 60 s default / 3600 s max time limits, timeout status mapping, CP-SAT as the authoritative infeasibility mechanism. Encoding C remains benchmark/research-only.
 5. **Deployment assumption recorded:** the 8-worker production configuration assumes the deployment host provides ≥ 8 logical CPU cores. The 500 benchmark was measured on the host above; a host with fewer logical cores invalidates the performance claim until re-validated there. No deployment manifest in the repo declares the production host's CPU/RAM.
+
+---
+
+## 38. Revision 6 — Objective-Reporting Rule (owner-approved, reporting-only)
+
+1. **Empirical discovery (1000-student benchmark, 2026-08-15):** the first 1,000-student production-path run timed out at 120 s and returned FEASIBLE. The reported `objectiveValue` (488) did **not** equal the independently computed `sameDepartmentAdjacentCount` (264). A diagnostic run confirmed the same discrepancy at larger scale (`solver.ObjectiveValue()` 1335 vs three independent counts of 323). Root cause: `o[s,t]` is only **lower-bounded** by the linking constraints, so a FEASIBLE incumbent is not guaranteed to have every auxiliary `o[s,t]` minimized to its tight bound before termination; `solver.ObjectiveValue()` can therefore be inflated on non-same-department edges. The bound is tight at OPTIMAL, which is why 100/500 (both OPTIMAL) never exhibited it.
+2. **Owner-approved fix is reporting-only (§5.1, §11, §29):** for FEASIBLE responses `solve_request` reports `objectiveValue = sameDepartmentAdjacentCount(returned assignment)` instead of `round(solver.ObjectiveValue())`; OPTIMAL reporting is unchanged. The raw solver objective is preserved in benchmark diagnostics/evidence. The fixed 1,000 run reported objective 272 == `sameDepartmentAdjacentCount` 272, valid=True, EXIT CODE: 0 (`docs/evidence/phase3-benchmarks/1000-production-8w-fixed.log`).
+3. **Explicitly unchanged:** the CP-SAT mathematical objective (`min Σ o[s,t]`, §11), the linking constraints, Encoding D, the validator (§29), Approach C, worker count, seed, and all frozen decisions. The objective-reporting rule is a **documentation of reporting behavior**, not a change to the mathematical model, and the validator is not weakened.
+4. **No implementation outside scope:** this revision changes `docs/phase3-cpsat-spec.md` only; the already-shipped solver reporting fix (§5.1) is the owner-approved implementation of this rule. No Prisma, migration, Phase 2, worker, or unrelated file is touched by this revision.

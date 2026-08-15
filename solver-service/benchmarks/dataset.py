@@ -17,12 +17,19 @@ from tests.helpers import make_hall, make_request
 DEPARTMENTS = ["CSE", "ECE", "EEE", "MECH", "CIVIL", "IT", "AIDS", "AIML", "CHEM", "EIE"]
 CLASS_SUFFIXES = [chr(ord("A") + i) for i in range(10)]  # A..J
 CLASS_SUFFIXES_1000 = [chr(ord("A") + i) for i in range(20)]  # A..T
+CLASS_SUFFIXES_2000 = [
+    *[chr(ord("A") + i) for i in range(26)],  # A..Z
+    *[f"A{chr(ord('A') + i)}" for i in range(14)],  # AA..AN
+]  # 40 suffixes
 
 HALLS_500 = [
     (f"hall-{i+1}", name, 5, 20) for i, name in enumerate(["LH01", "LH02", "LH03", "LH04", "LH05"])
 ]
 HALLS_1000 = [
     (f"hall-{i+1}", name, 5, 20) for i, name in enumerate([f"LH{i:02d}" for i in range(1, 11)])
+]
+HALLS_2000 = [
+    (f"hall-{i+1}", name, 5, 20) for i, name in enumerate([f"LH{i:02d}" for i in range(1, 21)])
 ]
 
 
@@ -84,6 +91,35 @@ def distribution_1000() -> dict:
     }
 
 
+def build_2000_dataset(time_limit_seconds: int = 180) -> SolveRequest:
+    """2000 validated candidates, 2000 active seats across 20 halls (5x20 each).
+
+    400 classes x 5 students each; 10 departments x 200 students each.
+    """
+    return _build(
+        halls=HALLS_2000,
+        suffixes=CLASS_SUFFIXES_2000,
+        time_limit_seconds=time_limit_seconds,
+        request_id="bench-2000",
+        exam_id="exam-2000",
+    )
+
+
+def distribution_2000() -> dict:
+    """Exact documented distribution for the 2000-student benchmark."""
+    return {
+        "candidateCount": len(DEPARTMENTS) * len(CLASS_SUFFIXES_2000) * 5,
+        "hallCount": len(HALLS_2000),
+        "seatCount": sum(rows * cols for _, _, rows, cols in HALLS_2000),
+        "classCount": len(DEPARTMENTS) * len(CLASS_SUFFIXES_2000),
+        "departmentCount": len(DEPARTMENTS),
+        "studentsPerClass": 5,
+        "studentsPerDepartment": len(CLASS_SUFFIXES_2000) * 5,
+        "rowsPerHall": 5,
+        "columnsPerHall": 20,
+    }
+
+
 def _build(
     halls: list[tuple[str, str, int, int]],
     suffixes: list[str],
@@ -131,7 +167,11 @@ if __name__ == "__main__":
     import sys
 
     size = sys.argv[1] if len(sys.argv) > 1 else "500"
-    if size == "1000":
+    if size == "2000":
+        request = build_2000_dataset()
+        d = distribution_2000()
+        label = "2000-student"
+    elif size == "1000":
         request = build_1000_dataset()
         d = distribution_1000()
         label = "1000-student"

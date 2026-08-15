@@ -1,0 +1,22 @@
+CAPTURED: 2026-08-15T10:33:56.1111688+05:30
+BRANCH: main
+
+git : warning: in the working copy of 'docs/evidence/phase3-benchmarks/1000-checkpoint.log', LF will be replaced by 
+CRLF the next time Git touches it
+At line:1 char:217
++ ... .log" 2>&1; git diff --name-only > "$dir\git-diff-name-only.log" 2>&1 ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: in the... Git touches it:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+warning: in the working copy of 'docs/evidence/phase3-benchmarks/npm-test.log', LF will be replaced by CRLF the next 
+time Git touches it
+warning: in the working copy of 'docs/phase3-benchmarks.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/phase3-cpsat-spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'solver-service/benchmarks/dataset.py', LF will be replaced by CRLF the next time Git 
+touches it
+docs/evidence/phase3-benchmarks/1000-checkpoint.log
+docs/evidence/phase3-benchmarks/npm-test.log
+docs/phase3-benchmarks.md
+docs/phase3-cpsat-spec.md
+solver-service/benchmarks/dataset.py

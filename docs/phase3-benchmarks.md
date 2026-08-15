@@ -1,9 +1,9 @@
 # Phase 3 — CP-SAT Solver Benchmarks: 500-Student Validation & 1000-Student Production-Path Gate
 
-Status: PHASE 3 MILESTONE 2 — COMPLETE / VERIFIED; MILESTONE 3 — VALID FEASIBLE RESULT / OPTIMALITY NOT PROVEN
+Status: PHASE 3 MILESTONE 2 — COMPLETE / VERIFIED; MILESTONE 3 — VALID FEASIBLE RESULT / OPTIMALITY NOT PROVEN; 2000 CHECKPOINT — SOLVER TIMEOUT (ERROR, no solution within 180 s cap)
 Author: (automated benchmark evidence)
 Date: 2026-08-15
-Spec: `docs/phase3-cpsat-spec.md` Revision 5
+Spec: `docs/phase3-cpsat-spec.md` Revision 6
 
 ## 1. Purpose
 
@@ -168,6 +168,13 @@ Production path only (Approach C, Encoding D); the dense oracle (Approach A) is
 | sameClassAdjacent / sameDepartmentAdjacent | 0 / 272 |
 | requiredZeros / structuralErrors | true / [] |
 
+Memory note: **4,518.9 MB is the measured peak production-path RSS on the
+measured benchmark host** (8 logical / 4 physical cores, 23.7 GB RAM). It is a
+measured fact, **not** a defined production memory budget — no deployment
+manifest in the repository defines a production memory limit, and no 16 GB
+budget is claimed. Approach A oracle memory remains benchmark/validation-only
+and is never deployed (§12, spec §37 item 3).
+
 **PHASE 3 MILESTONE 3 — VALID FEASIBLE RESULT / OPTIMALITY NOT PROVEN.**
 (Evidence: `1000-production-8w-fixed.log`, EXIT CODE: 0.)
 
@@ -199,3 +206,60 @@ assignment (§29 pairwise `sameDepartmentAdjacentCount`) instead of
   (85 passed / 3 skipped, 12 files passed / 1 skipped).
 - Regression: `pytest -q` 46 passed (solver-service); Phase 2 protection: no
   tracked diffs under `prisma/`, `src/`.
+
+## 14. 2000-student intermediate checkpoint (Milestone 3 close-out)
+
+Scaling/validation checkpoint (owner prompt): empirical memory/runtime data point
+between 1,000 and 4,000, and an independent exercise of the FEASIBLE
+objective-reporting fix (spec §5.1, Revision 6) under a different workload.
+Production path only (Approach A NOT run). Config: Approach C, Encoding D,
+`num_search_workers=8`, `random_seed=42`, `hardRuleScope=class`,
+8-neighbourhood, **`timeLimitSeconds=180` (hard cap, not extended)**. Dataset:
+2,000 candidates, 2,000 seats, 20 halls (5×20), 400 classes
+(10 departments × 40 suffixes A–Z/AA–AN), 5 students/class, 200 students/dept.
+
+| Metric | Value |
+|---|---|
+| Status | **ERROR** (SOLVER_TIMEOUT_NO_SOLUTION, spec §16) |
+| Termination | SOLVER_TIMEOUT (180 s cap reached, no feasible incumbent; infeasibility unproven) |
+| variableCount / constraintCount | 806,540 / 867,800 |
+| solverDurationMs | 243,986 (incl. model build; solve ran the full 180 s cap) |
+| Peak RSS | 5,541.5 MB (measured, production path) |
+| Peak CPU | 104.0% |
+| assigned / unassigned | 0 / 2,000 |
+| raw / validator / reported objective | None / 0 / None (no solution produced) |
+| OBJECTIVE_REPORTING_FIX_CHECK | **N/A** (no solution; not regressed — remains validated by the 1000 gate 272==272) |
+| structuralErrors | [] |
+
+**BENCHMARK = UNEXPECTED (status=ERROR), EXIT CODE: 2.**
+
+### 14.1 Interpretation
+
+- This is a **tractability / scaling** finding, **not** a solver/model correctness
+  defect: feasible arrangements certainly exist (each class needs only 5
+  pairwise-non-adjacent seats), but CP-SAT's global search over the class-scope
+  model at 2,000 could not find one within 180 s. This is consistent with spec
+  §32/§35: the class-scope hard rule (K = N/5) drives the S×K term
+  (~806 k variables / ~868 k constraints at 2,000; ~3.2 M variables estimated at
+  4,000). A 4,000 class-scope single-instance attempt is therefore not viable
+  within a practical time cap.
+- The 180 s cap was **not** extended and the run was **not** restarted, per the
+  owner prompt. No OOM/resource failure: peak 5.5 GB on the 23.7 GB measured
+  host; clean exit code 2.
+- Recommendation for 4,000 (owner decision required; **4,000 NOT started**):
+  adopt department-scope (§32) or per-hall decomposition (§30.5) before any
+  4,000 attempt; do not change the model without owner approval.
+
+## 15. Evidence (2000-student checkpoint)
+
+- `docs/evidence/phase3-benchmarks/2000-production-8w.log` — 2000 checkpoint
+  (Approach C, 8 workers, 180 s) — EXIT CODE: 2.
+- `docs/evidence/phase3-benchmarks/2000-checkpoint.log` — on-disk checkpoint,
+  incl. owner-approval provenance, interpretation, and regression records.
+- `docs/evidence/phase3-benchmarks/git-status.log`, `git-diff-stat.log`,
+  `git-diff-name-only.log`, `git-log.log`, `phase3-spec-diff.log` — captured git
+  evidence (actual command output).
+- `docs/evidence/phase3-benchmarks/npm-test.log` — Phase 2 regression
+  (85 passed / 3 skipped, 12 files passed / 1 skipped).
+- Regression: `pytest -q` 46 passed; Phase 2 protection: no tracked diffs under
+  `prisma/`, `src/`.

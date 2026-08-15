@@ -1,0 +1,9 @@
+CAPTURED: 2026-08-15T10:25:54.3988921+05:30
+BRANCH: main
+
+8a545ff bench: validate 1000-student cpsat production path
+425c7a7 docs: finalize phase 3 solver benchmark configuration
+e130092 feat: solver service with 500-student oracle validation and encoding benchmark
+db61f73 docs: approve phase 3 cpsat solver specification
+c7b4bc9 feat: complete exam document ingestion phase
+* main 8a545ff [origin/main] bench: validate 1000-student cpsat production path

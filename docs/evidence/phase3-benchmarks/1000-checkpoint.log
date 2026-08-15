@@ -39,3 +39,16 @@ Fix: solver.solve_request now reports objectiveValue = compute_validation_report
 pytest after fix: 46 passed.
 GATE RE-RUN (1000-production-8w-fixed.log): status=FEASIBLE objectiveValue=272 sameDepartmentAdjacentCount=272 requiredZeros=True structuralErrors=[] valid=True solverDurationMs=139734 memoryPeak=4518.9 MB cpuPeak=727.0% vars=203270 cons=233900 EXIT CODE: 0
 RESULT: PHASE 3 MILESTONE 3 - VALID FEASIBLE RESULT / OPTIMALITY NOT PROVEN
+
+=== OWNER-APPROVAL PROVENANCE (M3 CLOSE-OUT) ===
+TIMESTAMP: 2026-08-15T10:15:19.9542899+05:30
+OWNER_APPROVAL_STATUS = VERIFIED
+EVIDENCE: explicit owner approval in the OpenCode session on 2026-08-15, prior to
+implementation. The assistant presented the M3 objectiveValue defect with a decision
+question ("M3 defect fix"); the owner selected option "Reporting-only fix (Recommended)"
+("For FEASIBLE responses, report objectiveValue recomputed from the returned assignment
+(validator sameDepartmentAdjacentCount). No model change."). The fix was implemented and
+the 1000 gate re-run ONLY after this selection. Chain: defect discovered -> agent stopped
+-> owner explicitly approved -> provisional fix documented -> spec corrected -> regression
+tested -> 2000 empirical check -> owner decides on 4000.
+STATUS: reporting-only fix = APPROVED (not provisional)
