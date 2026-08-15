@@ -4,8 +4,8 @@
 **Date:** 2026-08-15
 **Phase 5 commit:** `7280d16` (`feat: add single-tenant authentication and seating API protection`)
 **Concurrency commit:** `407942c` (`fix: enable concurrent solver-domain execution`) — pushed unchanged
-**Final HEAD:** `42fc690f847e02766b25a7c81587d060d4cfd61f`
-**origin/main:** `42fc690f847e02766b25a7c81587d060d4cfd61f` (HEAD == origin/main)
+**Final HEAD:** `981df0ae7f6f4ecbcd71adfe21a08439081dd6ff`
+**origin/main:** `981df0ae7f6f4ecbcd71adfe21a08439081dd6ff` (HEAD == origin/main)
 
 ---
 
@@ -15,14 +15,15 @@
 |---|---|
 | Phase 5 commit | `7280d16e49b96517f760dac33393045e682020c5` |
 | Concurrency commit | `407942c586eaf6189230616e3a9fb14be70d6398` |
-| Final HEAD | `42fc690f847e02766b25a7c81587d060d4cfd61f` |
-| origin/main | `42fc690f847e02766b25a7c81587d060d4cfd61f` |
-| Pushes | `git push origin main` → `ec2a170..7280d16` then `7280d16..42fc690` (both exit 0, fast-forward) |
+| Final HEAD | `981df0ae7f6f4ecbcd71adfe21a08439081dd6ff` |
+| origin/main | `981df0ae7f6f4ecbcd71adfe21a08439081dd6ff` |
+| Pushes | `ec2a170..7280d16` → `7280d16..42fc690` → `42fc690..981df0a` (all exit 0, fast-forward) |
 | Working tree | No tracked modifications; `git diff origin/main` empty |
 
 History after push:
 
 ```text
+981df0a docs: update final close-out provenance to final HEAD
 42fc690 docs: record phase 5 finalization close-out
 7280d16 feat: add single-tenant authentication and seating API protection
 407942c fix: enable concurrent solver-domain execution
