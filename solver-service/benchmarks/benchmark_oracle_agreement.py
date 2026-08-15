@@ -23,9 +23,9 @@ from app.validation import (  # noqa: E402
 )
 from tests.helpers import make_hall, make_request  # noqa: E402
 
-# Benchmark uses 8 search workers to prove optimality quickly. Per §15 the comparable
-# metric is objectiveValue (not candidate identity), so workers do not affect the
-# correctness gate. Production solve_request keeps num_search_workers=1 (determinism).
+# Benchmark uses 8 search workers to prove optimality quickly. Per §12/§15 the
+# production default is now num_search_workers=8 (owner-approved 2026-08-14); the
+# comparable metric is objectiveValue plus independent validation, not candidate identity.
 SETTINGS = Settings(internal_token="benchmark", num_search_workers=8)
 
 

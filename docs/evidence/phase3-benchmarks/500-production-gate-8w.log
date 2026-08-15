@@ -1,0 +1,21 @@
+=== PHASE 3 MILESTONE 2 — 500-STUDENT BENCHMARK ===
+distribution: {"candidateCount": 500, "hallCount": 5, "seatCount": 500, "classCount": 100, "departmentCount": 10, "studentsPerClass": 5, "studentsPerDepartment": 50, "rowsPerHall": 5, "columnsPerHall": 20}
+timeLimitSeconds=900 benchmarkWorkers=8 prodWorkers=8
+
+[_SUMMARY] Approach A (dense oracle): status=OPTIMAL objective=0 durationMs=118844 memory=3853.5 MB varCount=None conCount=None assigned=500 sameClassAdj=0 sameDeptAdj=0 requiredZeros=True structuralErrors=[] valid=True
+[_SUMMARY] Approach C (structured, Encoding D, production): status=OPTIMAL objective=0 durationMs=47741 memory=1355.5 MB varCount=None conCount=None assigned=500 sameClassAdj=0 sameDeptAdj=0 requiredZeros=True structuralErrors=[] valid=True
+
+=== ORACLE AGREEMENT (§6.4) ===
+Approach A present=True OPTIMAL=True  Approach C present=True OPTIMAL=True
+sameOptimalObjectiveValue=YES  (A=0, C=0)
+bothIndependentlyValid=YES
+
+=== ENCODING COMPARISON (§6.6) ===
+EncodingStatus    Objective DurationMs  Vars      Constraints Valid
+
+=== VALIDATION METRICS ===
+{"model": "Approach A (dense oracle)", "status": "OPTIMAL", "objectiveValue": 0, "solverDurationMs": 118844, "memoryPeak": "3853.5 MB", "report": {"candidateCount": 500, "assignedCount": 500, "unassignedCount": 0, "duplicateCandidateCount": 0, "duplicateSeatCount": 0, "sameClassAdjacentCount": 0, "sameDepartmentAdjacentCount": 0, "hallsUsed": 5}, "valid": true}
+{"model": "Approach C (structured, Encoding D, production)", "status": "OPTIMAL", "objectiveValue": 0, "solverDurationMs": 47741, "memoryPeak": "1355.5 MB", "report": {"candidateCount": 500, "assignedCount": 500, "unassignedCount": 0, "duplicateCandidateCount": 0, "duplicateSeatCount": 0, "sameClassAdjacentCount": 0, "sameDepartmentAdjacentCount": 0, "hallsUsed": 5}, "valid": true}
+
+GATE_PASSED=YES
+EXIT CODE: 0

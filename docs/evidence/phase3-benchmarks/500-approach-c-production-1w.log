@@ -1,0 +1,18 @@
+=== PHASE 3 MILESTONE 2 — 500-STUDENT BENCHMARK ===
+distribution: {"candidateCount": 500, "hallCount": 5, "seatCount": 500, "classCount": 100, "departmentCount": 10, "studentsPerClass": 5, "studentsPerDepartment": 50, "rowsPerHall": 5, "columnsPerHall": 20}
+timeLimitSeconds=900 benchmarkWorkers=8 prodWorkers=1
+[_SUMMARY] Approach C (structured, Encoding D, production): status=FEASIBLE objective=129 durationMs=903439 memory=373.5 MB varCount=None conCount=None assigned=500 sameClassAdj=0 sameDeptAdj=129 requiredZeros=True structuralErrors=[] valid=True
+
+=== ORACLE AGREEMENT (§6.4) ===
+Approach A present=False OPTIMAL=False  Approach C present=True OPTIMAL=False
+sameOptimalObjectiveValue=NO  (A=None, C=129)
+bothIndependentlyValid=NO
+
+=== ENCODING COMPARISON (§6.6) ===
+EncodingStatus    Objective DurationMs  Vars      Constraints Valid
+
+=== VALIDATION METRICS ===
+{"model": "Approach C (structured, Encoding D, production)", "status": "FEASIBLE", "objectiveValue": 129, "solverDurationMs": 903439, "memoryPeak": "373.5 MB", "report": {"candidateCount": 500, "assignedCount": 500, "unassignedCount": 0, "duplicateCandidateCount": 0, "duplicateSeatCount": 0, "sameClassAdjacentCount": 0, "sameDepartmentAdjacentCount": 129, "hallsUsed": 5}, "valid": true}
+
+GATE_PASSED=NO
+EXIT CODE: 2

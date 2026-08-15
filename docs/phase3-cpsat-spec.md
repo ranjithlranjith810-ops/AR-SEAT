@@ -2,7 +2,7 @@
 
 > Specification only. No solver, FastAPI, Python, worker, or CP-SAT code is implemented by this document.
 > The authoritative source of the current repository state is `docs/phase3-discovery.md` and the source files it cites.
-> **Revision 4.** Revision 2 introduced a correct objective linkage (§11) but contained a **mathematically incorrect same-class constraint** (`z[s,K] + Σ_{t∈N(s)} z[t,K] ≤ 1`). That formulation was rejected and replaced in revision 3 with an exact encoding (**Encoding D**, §6.6, §7.2 C3, §9, §30.3), and the department objective was re-verified and confirmed correct (§11.4). Revision 4 makes two final specification-only corrections: the Approach A oracle is required to **agree on the optimal objective value** and produce an independently valid arrangement, not candidate-identical assignments (§6.4, §24–§27); and exact maximum-independent-set pre-computation is **optional**, not mandatory — CP-SAT remains the authoritative infeasibility mechanism (§9, §20, §30.5, §33). Encoding D and the department objective are unchanged.
+> **Revision 5.** Revision 5 resolves the last PROPOSED V1 decision (§28 item 10): the worker-count question is answered by the 500-student benchmark — `num_search_workers` is now **8** for production (§12, §15). It also adds the production memory-sizing note distinguishing the Approach A oracle from the Approach C + Encoding D production path (§12). No mathematical section, Encoding D, hard-rule scope, or objective changes. Revision 4 (below) introduced the oracle-agreement criterion and made independent-set pre-computation optional.
 
 **Baseline:** `c7b4bc9` — `feat: complete exam document ingestion phase`
 **Phase 2 status:** COMPLETE / VERIFIED / FROZEN
@@ -560,7 +560,9 @@ D1 != D2  ⇒  ∀d: RHS ≤ 0                  ⇒  o[S,T] = 0 (minimized)
 
 ## 12. Solver Parameters
 
-- `max_time_in_seconds = timeLimitSeconds`; `random_seed` default 42; `num_search_workers` default 1; `log_search_progress = true` (counts/durations/statuses only). No other tunables in V1.
+- `max_time_in_seconds = timeLimitSeconds`; `random_seed` default 42; `num_search_workers` default 8; `log_search_progress = true` (counts/durations/statuses only). No other tunables in V1.
+- **Worker-count decision (owner-approved, 2026-08-14):** **8 workers is the V1 production default.** Basis: the 500-student benchmark (§28 item 10, §36). Single-worker mode (`num_search_workers=1`) could not prove optimality on the tested 500-student dataset within 900 s — it returned FEASIBLE with objective 129. The same production model (Approach C, Encoding D) with `num_search_workers=8` proved OPTIMAL, objective 0, in ≈47 s on the measured host. Worker count affects runtime and may affect the exact optimal arrangement chosen; **do not** claim byte-for-byte deterministic assignments across worker counts. The correctness comparison is `objectiveValue` plus independent validation by the authoritative validator (§15, §29), not assignment identity. The 8-worker performance figure is benchmark evidence on the measured host, not a universal guarantee across all hardware.
+- **Memory sizing note (production):** Approach A memory measurements are benchmark/validation-only. Production memory sizing must use the Approach C + Encoding D measurements (Approach C + Encoding D peak RSS ≈1.37 GB at 500 students on the measured host; Approach A ≈3.64 GB — dense oracle, benchmark/validation only, **never deployed**). The 1.37 GB figure at 500 does **not** prove memory requirements at 4,000 or 10,000 candidates — those sizes require separate benchmarks.
 
 ---
 
@@ -582,7 +584,7 @@ halls: hallNumber asc;  seats: row asc then column asc (within hall);  candidate
 
 ## 15. Determinism
 
-Fixed ordering (§14), `random_seed` 42, single worker ⇒ same output for same input on the same machine/container. Not guaranteed across OR-Tools versions/architectures/worker counts; the comparable metric is `objectiveValue`.
+Fixed ordering (§14), `random_seed` 42, `num_search_workers` 8 ⇒ same output for same input on the same machine/container. Not guaranteed across OR-Tools versions, architectures, or worker counts. Worker count affects runtime and may change the exact optimal arrangement; **do not** claim byte-for-byte deterministic assignments across worker counts. The comparable correctness metric is `objectiveValue` plus independent validity per the authoritative validator (§29), not assignment identity.
 
 ---
 
@@ -813,7 +815,7 @@ objectiveValue, assignedCount, unassignedCount, memory, CPU
 7. Timeouts — default 60 s, max 3600 s, client = limit + 30 s — §16.
 8. Timeout-no-solution → ERROR (`SOLVER_TIMEOUT_NO_SOLUTION`) — §16.
 9. Heartbeat 15 s vs reap 60 s — retained existing default.
-10. Determinism — seed 42, single worker — §12.
+10. Determinism — seed 42, `num_search_workers` 8 — §12, §15. **(RESOLVED — owner-approved 2026-08-14.)**
 11. Batched persistence via additive `createAssignments` — §17.
 
 **UNRESOLVED (owner input required):** benchmark dataset distribution; auto-publish vs explicit review; FastAPI deployment topology/network path; `INSUFFICIENT_SEATS` admin UX; hall-fragmentation secondary objective tier.
@@ -955,3 +957,13 @@ Only `docs/phase3-cpsat-spec.md` may change as a result of this revision. No Pyt
 3. **Encoding D unchanged.** `Σ_{t∈N(s)} z[t,K] + deg(s)·z[s,K] ≤ deg(s)`, with its equivalence proof to `z[s,K]+z[t,K]≤1` per active-seat edge and per class, is preserved verbatim. The rejected revision-2 formulation was not reintroduced.
 4. **Department objective unchanged.** `min Σ o[s,t]` with `o[s,t] ≥ w[s,d]+w[t,d]−1` and the empty-seat correctness argument (§11.4) are preserved.
 5. **No implementation.** This revision changed `docs/phase3-cpsat-spec.md` only. No code, dependency, schema, migration, worker, FastAPI, Python, OR-Tools, or Phase 2 file was created or modified. Implementation must not start until the owner approves this revision.
+
+---
+
+## 37. Revision 5 — Production Worker-Count Decision (owner-approved)
+
+1. **`num_search_workers` = 8 is the V1 production default (§12, §15, §28 item 10).** This resolves the previously-proposed worker-count decision.
+2. **Basis (500-student benchmark, measured host — 8 logical cores / 4 physical / 23.7 GB RAM):** single worker returned FEASIBLE objective 129 in ≈903 s without proving optimality; 8 workers proved OPTIMAL objective 0 in ≈47 s. Objective value and independent validation — not byte-for-byte assignment identity — are the correctness comparison.
+3. **Memory documentation (§12):** Approach A measurements (≈3.64 GB RSS at 500) are benchmark/validation-only and must not be used for production sizing; Approach C + Encoding D (≈1.37 GB RSS at 500) is the production-path figure. Neither figure proves behavior at 4,000 / 10,000 — those need separate benchmarks.
+4. **Unchanged:** Approach C model, Encoding D, 8-neighbourhood, classSnapshot hard rule, departmentSnapshot soft objective, seed 42, global hall pool, 60 s default / 3600 s max time limits, timeout status mapping, CP-SAT as the authoritative infeasibility mechanism. Encoding C remains benchmark/research-only.
+5. **Deployment assumption recorded:** the 8-worker production configuration assumes the deployment host provides ≥ 8 logical CPU cores. The 500 benchmark was measured on the host above; a host with fewer logical cores invalidates the performance claim until re-validated there. No deployment manifest in the repo declares the production host's CPU/RAM.

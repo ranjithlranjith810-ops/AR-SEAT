@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     max_candidates: int = 10_000
     max_request_bytes: int = 16 * 1024 * 1024
     random_seed: int = 42
-    num_search_workers: int = 1
+    num_search_workers: int = 8
     model: str = "structured"
     log_search_progress: bool = False
 
