@@ -1,0 +1,8 @@
+﻿0583fb0 feat: session & physical-domain partitioned seating engine (phase A-E)
+6a1b461 docs: record final post-commit state for milestone 3 evidence close-out
+146fa1d docs: evidence close-out - commit provenance, 2000 timing and cpu reconciliation
+7411c1f docs: close out milestone 3 - 2000 checkpoint, objective reporting spec
+8a545ff bench: validate 1000-student cpsat production path
+425c7a7 docs: finalize phase 3 solver benchmark configuration
+e130092 feat: solver service with 500-student oracle validation and encoding benchmark
+db61f73 docs: approve phase 3 cpsat solver specification
