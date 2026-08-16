@@ -120,8 +120,8 @@ async function handleRequest(
       json(res, error.status, { error: error.code, message: error.message });
       return;
     }
-    const message = error instanceof Error ? error.message : String(error);
-    json(res, 500, { error: "INTERNAL_ERROR", message });
+    console.error("[api] unexpected error", error);
+    json(res, 500, { error: "INTERNAL_ERROR", message: "An unexpected error occurred" });
   }
 }
 
