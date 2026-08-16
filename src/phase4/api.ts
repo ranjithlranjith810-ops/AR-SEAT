@@ -23,6 +23,7 @@ import type {
 } from "./types";
 import { runSeatingGeneration } from "./integration";
 import { getSeatingPlanForExam } from "./persist";
+import { SeatingError } from "../errors";
 import {
   AuthError,
   requireAdmin,
@@ -118,6 +119,10 @@ async function handleRequest(
   } catch (error) {
     if (error instanceof AuthError) {
       json(res, error.status, { error: error.code, message: error.message });
+      return;
+    }
+    if (error instanceof SeatingError && error.code === "PLAN_NOT_FOUND") {
+      json(res, 404, { error: "PLAN_NOT_FOUND" });
       return;
     }
     console.error("[api] unexpected error", error);

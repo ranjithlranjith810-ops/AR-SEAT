@@ -232,7 +232,7 @@ expect(createRes.status).not.toBe(401);
     const statusRes = await authedFetch(`/exam-seating/generations/${viewId}`, loginResult.token);
     expect(statusRes.status).toBe(200);
     // The seating endpoint passes the same auth gate; a missing PUBLISHED plan
-    // is the pre-existing Phase 4 PLAN_NOT_FOUND (500), not an auth failure.
+    // is the intentional Phase 7c PLAN_NOT_FOUND contract (404), not an auth failure.
     const seatingRes = await authedFetch(`/exam-seating/generations/${viewId}/seating`, loginResult.token);
     expect(seatingRes.status).not.toBe(401);
     expect(seatingRes.status).not.toBe(403);
