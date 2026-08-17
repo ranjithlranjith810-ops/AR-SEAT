@@ -5,6 +5,27 @@ export function sha256(data: Uint8Array): string {
   return createHash("sha256").update(data).digest("hex");
 }
 
+export const MAX_FILE_NAME_LENGTH = 255;
+
+/**
+ * Phase 9 — display-name control for client-supplied filenames (ingestion
+ * security review §1–§4). The storage KEY is sanitized separately by
+ * buildStoragePath; this function governs the fileName persisted into
+ * UploadedExamDocument.fileName.
+ */
+export function sanitizeFileName(value: string): string {
+  let out = value.normalize("NFC");
+  // C0/C1 controls, bidi controls (ALM, LRM, RLM, embeddings/overrides,
+  // isolates) are stripped; whitespace is collapsed.
+  out = out.replace(
+    /[\u0000-\u001F\u007F-\u009F\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/g,
+    "",
+  );
+  out = out.replace(/\s+/g, " ").trim();
+  if (out.length > MAX_FILE_NAME_LENGTH) out = out.slice(0, MAX_FILE_NAME_LENGTH);
+  return out.length === 0 ? "document.pdf" : out;
+}
+
 export interface StorageUpload {
   ok: true;
   key: string;

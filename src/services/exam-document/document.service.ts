@@ -2,7 +2,7 @@ import { DocumentParseStatus, Prisma } from "@prisma/client";
 import { prisma } from "../../db.js";
 import { SeatingError } from "../../errors.js";
 import { logAudit } from "../audit.service.js";
-import { sha256 } from "./upload.js";
+import { sanitizeFileName, sha256 } from "./upload.js";
 
 export interface RegisterDocumentInput {
   examId: string;
@@ -50,10 +50,11 @@ export async function registerDocument(
       duplicate: true,
     };
   }
+  const fileName = sanitizeFileName(input.fileName);
   const document = await prisma.uploadedExamDocument.create({
     data: {
       examId: input.examId,
-      fileName: input.fileName,
+      fileName,
       storagePath: input.storagePath,
       mimeType: input.mimeType,
       fileSize: input.fileBytes.length,
@@ -67,7 +68,7 @@ export async function registerDocument(
     entityType: "UploadedExamDocument",
     entityId: document.id,
     actorId,
-    metadata: { fileName: input.fileName, fileSize: input.fileBytes.length, fileHash },
+    metadata: { fileName, fileSize: input.fileBytes.length, fileHash },
   });
   return { document, created: true, duplicate: false };
 }
