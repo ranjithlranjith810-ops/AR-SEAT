@@ -1,4 +1,5 @@
 import type {
+  Candidate,
   CandidatePage,
   Exam,
   GenerationCreated,
@@ -115,6 +116,17 @@ export async function getDocumentCandidates(
   return request<CandidatePage>(
     `/exam-seating/documents/${encodeURIComponent(id)}/candidates?${query}`,
   );
+}
+
+export async function resolveCandidate(
+  documentId: string,
+  candidateId: string,
+): Promise<Candidate> {
+  const res = await request<{ candidate: Candidate }>(
+    `/exam-seating/documents/${encodeURIComponent(documentId)}/candidates/${encodeURIComponent(candidateId)}/resolve`,
+    { method: "POST" },
+  );
+  return res.candidate;
 }
 
 export async function getExams(): Promise<Exam[]> {

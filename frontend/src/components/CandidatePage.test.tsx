@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router-dom";
 import { ApiError } from "../lib/api";
@@ -14,13 +14,16 @@ vi.mock("../lib/api", async (importOriginal) => {
     getDocument: vi.fn(),
     getDocumentCandidates: vi.fn(),
     generateSeating: vi.fn(),
+    resolveCandidate: vi.fn(),
   };
 });
 
-const { getDocument, getDocumentCandidates, generateSeating } = await import("../lib/api");
+const { getDocument, getDocumentCandidates, generateSeating, resolveCandidate } =
+  await import("../lib/api");
 const mockedGetDocument = vi.mocked(getDocument);
 const mockedCandidates = vi.mocked(getDocumentCandidates);
 const mockedGenerateSeating = vi.mocked(generateSeating);
+const mockedResolveCandidate = vi.mocked(resolveCandidate);
 
 function doc(overrides: Partial<UploadedDocument> = {}): UploadedDocument {
   return {
@@ -85,6 +88,7 @@ beforeEach(() => {
   mockedGetDocument.mockReset();
   mockedCandidates.mockReset();
   mockedGenerateSeating.mockReset();
+  mockedResolveCandidate.mockReset();
 });
 
 describe("CandidatePage", () => {
@@ -242,5 +246,90 @@ describe("CandidatePage", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("ALICE")).toBeInTheDocument();
     expect(screen.queryByText("generation-target")).not.toBeInTheDocument();
+  });
+
+  it("offers an ADMIN a Resolve action for MATCHED candidates", async () => {
+    mockedGetDocument.mockResolvedValue(doc());
+    mockedCandidates.mockResolvedValue(page(2, 0, [candidate("R1", "ALICE"), candidate("R2", "BOB")]));
+    renderCandidates(adminUser);
+
+    await screen.findByText("ALICE");
+    expect(screen.getAllByRole("button", { name: "Resolve" })).toHaveLength(2);
+  });
+
+  it("does not offer STAFF a Resolve action", async () => {
+    mockedGetDocument.mockResolvedValue(doc());
+    mockedCandidates.mockResolvedValue(page(2, 0, [candidate("R1", "ALICE")]));
+    renderCandidates(staffUser);
+
+    await screen.findByText("ALICE");
+    expect(screen.queryByRole("button", { name: "Resolve" })).not.toBeInTheDocument();
+  });
+
+  it("resolving a candidate POSTs to the backend and updates the row to VALIDATED", async () => {
+    mockedGetDocument.mockResolvedValue(doc());
+    mockedCandidates.mockResolvedValue(page(2, 0, [candidate("R1", "ALICE"), candidate("R2", "BOB")]));
+    mockedResolveCandidate.mockResolvedValue({ ...candidate("R1", "ALICE"), validationStatus: "VALIDATED" });
+    renderCandidates(adminUser);
+
+    const uploader = userEvent.setup();
+    const r1Row = (await screen.findByText("ALICE")).closest("tr");
+    expect(r1Row).not.toBeNull();
+    await uploader.click(within(r1Row as HTMLElement).getByRole("button", { name: "Resolve" }));
+
+    expect(mockedResolveCandidate).toHaveBeenCalledWith("doc-1", "c-R1");
+    expect(await screen.findByText("VALIDATED")).toBeInTheDocument();
+    expect(screen.getAllByText("MATCHED")).toHaveLength(1);
+  });
+
+  it("disables further resolve submissions while a request is in flight", async () => {
+    mockedGetDocument.mockResolvedValue(doc());
+    mockedCandidates.mockResolvedValue(page(2, 0, [candidate("R1", "ALICE"), candidate("R2", "BOB")]));
+    mockedResolveCandidate.mockReturnValue(new Promise(() => undefined));
+
+    const uploader = userEvent.setup();
+    renderCandidates(adminUser);
+    await screen.findByText("ALICE");
+
+    const r1Row = screen.getByText("ALICE").closest("tr") as HTMLElement;
+    await uploader.click(within(r1Row).getByRole("button", { name: "Resolve" }));
+    expect(await screen.findByText("Resolving...")).toBeInTheDocument();
+
+    const r2Row = screen.getByText("BOB").closest("tr") as HTMLElement;
+    await uploader.click(within(r2Row).getByRole("button", { name: "Resolve" }));
+
+    expect(mockedResolveCandidate).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces a repeated-resolution 409 without changing the row", async () => {
+    mockedGetDocument.mockResolvedValue(doc());
+    mockedCandidates.mockResolvedValue(page(2, 0, [candidate("R1", "ALICE"), candidate("R2", "BOB")]));
+    mockedResolveCandidate.mockRejectedValue(
+      new ApiError(409, "INVALID_VALIDATION_STATUS_TRANSITION", "VALIDATED -> VALIDATED"),
+    );
+    renderCandidates(adminUser);
+
+    const uploader = userEvent.setup();
+    const r1Row = (await screen.findByText("ALICE")).closest("tr");
+    expect(r1Row).not.toBeNull();
+    await uploader.click(within(r1Row as HTMLElement).getByRole("button", { name: "Resolve" }));
+
+    expect(
+      await screen.findByText("This candidate cannot be resolved in its current state."),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("MATCHED")).toHaveLength(2);
+  });
+
+  it("surfaces a missing-candidate 404 without leaking details", async () => {
+    mockedGetDocument.mockResolvedValue(doc());
+    mockedCandidates.mockResolvedValue(page(2, 0, [candidate("R1", "ALICE")]));
+    mockedResolveCandidate.mockRejectedValue(new ApiError(404, "CANDIDATE_NOT_FOUND", "not found"));
+    renderCandidates(adminUser);
+
+    const uploader = userEvent.setup();
+    await uploader.click(await screen.findByRole("button", { name: "Resolve" }));
+
+    expect(await screen.findByText("Candidate not found.")).toBeInTheDocument();
+    expect(screen.getByText("ALICE")).toBeInTheDocument();
   });
 });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ApiError, generateSeating, getDocument, getDocumentCandidates } from "../lib/api";
+import { ApiError, generateSeating, getDocument, getDocumentCandidates, resolveCandidate } from "../lib/api";
 import type { CandidatePage as CandidatePageData, UploadedDocument } from "../lib/types";
 import { useAuth } from "../auth/AuthContext";
 import { Alert, PageLoader } from "./ui";
@@ -18,6 +18,8 @@ export function CandidatePage() {
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [resolveError, setResolveError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +79,24 @@ export function CandidatePage() {
     }
   }
 
+  async function handleResolve(candidateId: string) {
+    if (!document || resolvingId) return;
+    setResolvingId(candidateId);
+    setResolveError(null);
+    try {
+      const updated = await resolveCandidate(document.id, candidateId);
+      setPage((prev) =>
+        prev
+          ? { ...prev, candidates: prev.candidates.map((c) => (c.id === updated.id ? updated : c)) }
+          : prev,
+      );
+    } catch (err) {
+      setResolveError(safeResolveError(err));
+    } finally {
+      setResolvingId(null);
+    }
+  }
+
   return (
     <div className="panel">
       <h1>Candidates</h1>
@@ -109,6 +129,7 @@ export function CandidatePage() {
                   <th scope="col">Department</th>
                   <th scope="col">Subject code</th>
                   <th scope="col">Validation</th>
+                  <th scope="col">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -120,6 +141,18 @@ export function CandidatePage() {
                     <td>{candidate.departmentSnapshot}</td>
                     <td>{candidate.subjectCode}</td>
                     <td>{candidate.validationStatus}</td>
+                    <td>
+                      {isAdmin && candidate.validationStatus === "MATCHED" && (
+                        <button
+                          type="button"
+                          className="button button--ghost"
+                          disabled={resolvingId !== null}
+                          onClick={() => void handleResolve(candidate.id)}
+                        >
+                          {resolvingId === candidate.id ? "Resolving..." : "Resolve"}
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -156,6 +189,7 @@ export function CandidatePage() {
       )}
 
       {generateError && <Alert variant="danger">{generateError}</Alert>}
+      {resolveError && <Alert variant="danger">{resolveError}</Alert>}
 
       {isAdmin && (
         <div className="form-actions">
@@ -192,6 +226,26 @@ function safeGenerateError(err: unknown): string {
         return "Exam information is missing. Please upload the document again.";
       case "UNAUTHORIZED":
         return "Your session has expired. Please log in again.";
+      case "NETWORK_ERROR":
+        return "Unable to reach the server. Please try again.";
+      default:
+        return "Something went wrong. Please try again.";
+    }
+  }
+  return "Something went wrong. Please try again.";
+}
+
+function safeResolveError(err: unknown): string {
+  if (err instanceof ApiError) {
+    switch (err.code) {
+      case "CANDIDATE_NOT_FOUND":
+        return "Candidate not found.";
+      case "INVALID_VALIDATION_STATUS_TRANSITION":
+        return "This candidate cannot be resolved in its current state.";
+      case "UNAUTHORIZED":
+        return "Your session has expired. Please log in again.";
+      case "FORBIDDEN":
+        return "You do not have permission to resolve candidates.";
       case "NETWORK_ERROR":
         return "Unable to reach the server. Please try again.";
       default:

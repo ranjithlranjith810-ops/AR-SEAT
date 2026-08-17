@@ -37,6 +37,10 @@ import { approvePlan, publishPlan } from "../services/seatingPlan.service";
 import { getDocument } from "../services/exam-document/document.service";
 import { ingestExamDocument } from "../services/exam-document/ingest";
 import {
+  getCandidate,
+  transitionValidationStatus,
+} from "../services/candidate.service";
+import {
   AuthError,
   requireAdmin,
   requireAuth,
@@ -178,6 +182,20 @@ async function handleRequest(
       return;
     }
 
+    const resolveCandidateMatch = path.match(
+      /^\/exam-seating\/documents\/([^/]+)\/candidates\/([^/]+)\/resolve$/,
+    );
+    if (method === "POST" && resolveCandidateMatch) {
+      const actor = requireAdmin(user);
+      await handleResolveCandidate(
+        res,
+        resolveCandidateMatch[1]!,
+        resolveCandidateMatch[2]!,
+        actor.id,
+      );
+      return;
+    }
+
     const documentMatch = path.match(/^\/exam-seating\/documents\/([^/]+)$/);
     if (method === "GET" && documentMatch) {
       requireAuth(user);
@@ -211,6 +229,14 @@ async function handleRequest(
     }
     if (error instanceof SeatingError && error.code === "DOCUMENT_NOT_FOUND") {
       json(res, 404, { error: "DOCUMENT_NOT_FOUND" });
+      return;
+    }
+    if (error instanceof SeatingError && error.code === "CANDIDATE_NOT_FOUND") {
+      json(res, 404, { error: "CANDIDATE_NOT_FOUND" });
+      return;
+    }
+    if (error instanceof SeatingError && error.code === "INVALID_VALIDATION_STATUS_TRANSITION") {
+      json(res, 409, { error: error.code, message: error.message });
       return;
     }
     if (error instanceof SeatingError && error.code === "ALREADY_APPROVED") {
@@ -501,6 +527,44 @@ async function handleGetDocumentCandidates(
     limit: parsedLimit,
     candidates,
   });
+}
+
+async function handleResolveCandidate(
+  res: import("node:http").ServerResponse,
+  documentId: string,
+  candidateId: string,
+  actorId: string,
+) {
+  const candidate = await getCandidate(candidateId);
+  if (candidate.sourceDocumentId !== documentId) {
+    throw new SeatingError("ExamCandidate not found", "CANDIDATE_NOT_FOUND");
+  }
+  const updated = await transitionValidationStatus(candidateId, "VALIDATED", actorId);
+  json(res, 200, { candidate: serializeCandidate(updated) });
+}
+
+function serializeCandidate(candidate: {
+  id: string;
+  registerNumberSnapshot: string;
+  studentNameSnapshot: string;
+  departmentSnapshot: string;
+  genderSnapshot: string;
+  classSnapshot: string;
+  subjectCode: string;
+  subjectName: string;
+  validationStatus: string;
+}) {
+  return {
+    id: candidate.id,
+    registerNumberSnapshot: candidate.registerNumberSnapshot,
+    studentNameSnapshot: candidate.studentNameSnapshot,
+    departmentSnapshot: candidate.departmentSnapshot,
+    genderSnapshot: candidate.genderSnapshot,
+    classSnapshot: candidate.classSnapshot,
+    subjectCode: candidate.subjectCode,
+    subjectName: candidate.subjectName,
+    validationStatus: candidate.validationStatus,
+  };
 }
 
 function serializeDocument(document: {

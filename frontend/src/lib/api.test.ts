@@ -9,9 +9,10 @@ import {
   getSeatingPlan,
   login,
   publishSeatingPlan,
+  resolveCandidate,
   uploadDocument,
 } from "./api";
-import type { CandidatePage, GenerationCreated, IngestReport, PublicUser } from "./types";
+import type { Candidate, CandidatePage, GenerationCreated, IngestReport, PublicUser } from "./types";
 
 const originalFetch = globalThis.fetch;
 
@@ -254,6 +255,58 @@ describe("api client", () => {
     await expect(publishSeatingPlan("plan-1")).rejects.toMatchObject({
       status: 409,
       code: "ALREADY_PUBLISHED",
+    });
+  });
+
+  it("resolveCandidate POSTs to the resolve endpoint and unwraps the candidate", async () => {
+    const candidate: Candidate = {
+      id: "c-R1",
+      registerNumberSnapshot: "R1",
+      studentNameSnapshot: "ALICE",
+      departmentSnapshot: "CSE",
+      genderSnapshot: "MALE",
+      classSnapshot: "CSE-A",
+      subjectCode: "CS501",
+      subjectName: "OS",
+      validationStatus: "VALIDATED",
+    };
+    stubFetchOnce({ status: 200, body: { candidate } });
+    const result = await resolveCandidate("doc-1", "c-R1");
+    expect(result).toEqual(candidate);
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe("/exam-seating/documents/doc-1/candidates/c-R1/resolve");
+    expect(init.method).toBe("POST");
+    expect(init.credentials).toBe("include");
+  });
+
+  it("resolveCandidate encodes document and candidate ids", async () => {
+    stubFetchOnce({ status: 200, body: { candidate: { id: "c/1", validationStatus: "VALIDATED" } } });
+    await resolveCandidate("doc /1", "c/1");
+    const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url).toBe(
+      "/exam-seating/documents/doc%20%2F1/candidates/c%2F1/resolve",
+    );
+  });
+
+  it("resolveCandidate surfaces 409 INVALID_VALIDATION_STATUS_TRANSITION", async () => {
+    stubFetchOnce({
+      status: 409,
+      body: { error: "INVALID_VALIDATION_STATUS_TRANSITION", message: "Invalid validation status transition: VALIDATED -> VALIDATED" },
+    });
+    await expect(resolveCandidate("doc-1", "c-R1")).rejects.toMatchObject({
+      status: 409,
+      code: "INVALID_VALIDATION_STATUS_TRANSITION",
+    });
+  });
+
+  it("resolveCandidate surfaces 404 CANDIDATE_NOT_FOUND", async () => {
+    stubFetchOnce({ status: 404, body: { error: "CANDIDATE_NOT_FOUND" } });
+    await expect(resolveCandidate("doc-1", "unknown")).rejects.toMatchObject({
+      status: 404,
+      code: "CANDIDATE_NOT_FOUND",
     });
   });
 
