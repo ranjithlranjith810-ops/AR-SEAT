@@ -1,19 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Route, Routes } from "react-router-dom";
 import { ApiError } from "../lib/api";
-import type { Candidate, CandidatePage as CandidatePageData, UploadedDocument } from "../lib/types";
+import type { Candidate, CandidatePage as CandidatePageData, GenerationCreated, PublicUser, UploadedDocument } from "../lib/types";
 import { CandidatePage } from "./CandidatePage";
-import { renderParamRoute } from "../test/harness";
+import { adminUser, renderParamRoute, renderRoutes, staffUser } from "../test/harness";
 
 vi.mock("../lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/api")>();
-  return { ...actual, getDocument: vi.fn(), getDocumentCandidates: vi.fn() };
+  return {
+    ...actual,
+    getDocument: vi.fn(),
+    getDocumentCandidates: vi.fn(),
+    generateSeating: vi.fn(),
+  };
 });
 
-const { getDocument, getDocumentCandidates } = await import("../lib/api");
+const { getDocument, getDocumentCandidates, generateSeating } = await import("../lib/api");
 const mockedGetDocument = vi.mocked(getDocument);
 const mockedCandidates = vi.mocked(getDocumentCandidates);
+const mockedGenerateSeating = vi.mocked(generateSeating);
 
 function doc(overrides: Partial<UploadedDocument> = {}): UploadedDocument {
   return {
@@ -50,9 +57,34 @@ function page(total: number, offset: number, candidates: Candidate[]): Candidate
   return { documentId: "doc-1", total, offset, limit: 20, candidates };
 }
 
+function renderCandidates(
+  user: PublicUser | null = null,
+  initial = "/documents/doc-1/candidates",
+) {
+  return renderRoutes(
+    <Routes>
+      <Route path="/documents/:documentId/candidates" element={<CandidatePage />} />
+      <Route path="/generations/:generationId" element={<div>generation-target</div>} />
+    </Routes>,
+    user,
+    initial,
+  );
+}
+
+function created(overrides: Partial<GenerationCreated> = {}): GenerationCreated {
+  return {
+    generationId: "gen-1",
+    state: "COMPLETED",
+    pollUrl: "/exam-seating/generations/gen-1",
+    jobId: "job-1",
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   mockedGetDocument.mockReset();
   mockedCandidates.mockReset();
+  mockedGenerateSeating.mockReset();
 });
 
 describe("CandidatePage", () => {
@@ -147,5 +179,68 @@ describe("CandidatePage", () => {
 
     resolveNext(page(40, 20, [candidate("R21", "CAROL")]));
     await waitFor(() => expect(screen.getByText("CAROL")).toBeInTheDocument());
+  });
+
+  it("offers an ADMIN the Generate seating action", async () => {
+    mockedGetDocument.mockResolvedValue(doc());
+    mockedCandidates.mockResolvedValue(page(2, 0, [candidate("R1", "ALICE")]));
+    renderCandidates(adminUser);
+
+    await screen.findByText("ALICE");
+    expect(screen.getByRole("button", { name: "Generate seating" })).toBeInTheDocument();
+  });
+
+  it("does not offer STAFF a Generate seating action", async () => {
+    mockedGetDocument.mockResolvedValue(doc());
+    mockedCandidates.mockResolvedValue(page(2, 0, [candidate("R1", "ALICE")]));
+    renderCandidates(staffUser);
+
+    await screen.findByText("ALICE");
+    expect(screen.queryByRole("button", { name: "Generate seating" })).not.toBeInTheDocument();
+  });
+
+  it("generating seating sends the backend document examId and navigates to the status view", async () => {
+    mockedGetDocument.mockResolvedValue(doc());
+    mockedCandidates.mockResolvedValue(page(2, 0, [candidate("R1", "ALICE")]));
+    mockedGenerateSeating.mockResolvedValue(created());
+    renderCandidates(adminUser);
+
+    const uploader = userEvent.setup();
+    await uploader.click(await screen.findByRole("button", { name: "Generate seating" }));
+
+    expect(await screen.findByText("generation-target")).toBeInTheDocument();
+    expect(mockedGenerateSeating).toHaveBeenCalledWith("exam-1");
+  });
+
+  it("prevents duplicate generation submissions while a request is in flight", async () => {
+    mockedGetDocument.mockResolvedValue(doc());
+    mockedCandidates.mockResolvedValue(page(2, 0, [candidate("R1", "ALICE")]));
+    mockedGenerateSeating.mockReturnValue(new Promise(() => undefined));
+
+    const uploader = userEvent.setup();
+    renderCandidates(adminUser);
+    const button = await screen.findByRole("button", { name: "Generate seating" });
+    await uploader.click(button);
+    await uploader.click(button);
+
+    expect(mockedGenerateSeating).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces a duplicate-generation 409 without navigating away", async () => {
+    mockedGetDocument.mockResolvedValue(doc());
+    mockedCandidates.mockResolvedValue(page(2, 0, [candidate("R1", "ALICE")]));
+    mockedGenerateSeating.mockRejectedValue(
+      new ApiError(409, "ERR_JOB_ALREADY_ACTIVE", "active generation already exists"),
+    );
+    renderCandidates(adminUser);
+
+    const uploader = userEvent.setup();
+    await uploader.click(await screen.findByRole("button", { name: "Generate seating" }));
+
+    expect(
+      await screen.findByText("A seating generation for this exam is already in progress."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("ALICE")).toBeInTheDocument();
+    expect(screen.queryByText("generation-target")).not.toBeInTheDocument();
   });
 });

@@ -7,6 +7,7 @@
  * No new tables, no migrations, no unrelated schema changes.
  */
 import { prisma } from "../db";
+import type { Prisma } from "@prisma/client";
 import { SeatingError } from "../errors";
 import {
   completeSolve,
@@ -147,30 +148,45 @@ export function collectAssignments(result: GenerationResult): DomainAssignment[]
   return assignments;
 }
 
+const SEATING_PLAN_INCLUDE = {
+  assignments: {
+    include: {
+      examCandidate: {
+        select: {
+          id: true,
+          registerNumberSnapshot: true,
+          studentNameSnapshot: true,
+          departmentSnapshot: true,
+          classSnapshot: true,
+          subjectCode: true,
+        },
+      },
+      hall: { select: { id: true, hallNumber: true, rows: true, columns: true } },
+      hallSeat: { select: { id: true, seatPosition: true, row: true, column: true } },
+    },
+    orderBy: [
+      { hall: { hallNumber: "asc" as const } },
+      { hallSeat: { row: "asc" as const } },
+      { hallSeat: { column: "asc" as const } },
+    ],
+  },
+} satisfies Prisma.SeatingPlanInclude;
+
 export async function getSeatingPlanForExam(examId: string) {
   const plan = await prisma.seatingPlan.findFirst({
     where: { examId, status: "PUBLISHED" },
     orderBy: { version: "desc" },
-    include: {
-      assignments: {
-        include: {
-          examCandidate: {
-            select: {
-              id: true,
-              registerNumberSnapshot: true,
-              studentNameSnapshot: true,
-              departmentSnapshot: true,
-              classSnapshot: true,
-              subjectCode: true,
-            },
-          },
-          hall: { select: { id: true, hallNumber: true, rows: true, columns: true } },
-          hallSeat: { select: { id: true, seatPosition: true, row: true, column: true } },
-        },
-        orderBy: [{ hall: { hallNumber: "asc" } }, { hallSeat: { row: "asc" } }, { hallSeat: { column: "asc" } }],
-      },
-    },
+    include: SEATING_PLAN_INCLUDE,
   });
   if (!plan) throw new SeatingError("No PUBLISHED seating plan for exam", "PLAN_NOT_FOUND");
+  return plan;
+}
+
+export async function getSeatingPlanById(planId: string) {
+  const plan = await prisma.seatingPlan.findUnique({
+    where: { id: planId },
+    include: SEATING_PLAN_INCLUDE,
+  });
+  if (!plan) throw new SeatingError("SeatingPlan not found", "PLAN_NOT_FOUND");
   return plan;
 }

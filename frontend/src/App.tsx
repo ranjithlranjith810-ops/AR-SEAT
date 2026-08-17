@@ -4,9 +4,11 @@ import { RequireAdmin, RequireAuth } from "./auth/guards";
 import { CandidatePage } from "./components/CandidatePage";
 import { DocumentStatusPage } from "./components/DocumentStatusPage";
 import { ExamSelectionPage } from "./components/ExamSelectionPage";
+import { GenerationStatusPage } from "./components/GenerationStatusPage";
 import { HomePage } from "./components/HomePage";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./components/LoginPage";
+import { SeatingPage } from "./components/SeatingPage";
 import { UploadPage } from "./components/UploadPage";
 
 function NotFound() {
@@ -50,6 +52,8 @@ export default function App() {
             />
             <Route path="/documents/:documentId" element={<DocumentStatusPage />} />
             <Route path="/documents/:documentId/candidates" element={<CandidatePage />} />
+            <Route path="/generations/:generationId" element={<GenerationStatusPage />} />
+            <Route path="/seating/:seatingPlanId" element={<SeatingPage />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>

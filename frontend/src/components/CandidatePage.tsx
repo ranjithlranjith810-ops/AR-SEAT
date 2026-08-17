@@ -1,18 +1,23 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { ApiError, getDocument, getDocumentCandidates } from "../lib/api";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { ApiError, generateSeating, getDocument, getDocumentCandidates } from "../lib/api";
 import type { CandidatePage as CandidatePageData, UploadedDocument } from "../lib/types";
+import { useAuth } from "../auth/AuthContext";
 import { Alert, PageLoader } from "./ui";
 
 const PAGE_SIZE = 20;
 
 export function CandidatePage() {
   const { documentId = "" } = useParams();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [document, setDocument] = useState<UploadedDocument | null>(null);
   const [page, setPage] = useState<CandidatePageData | null>(null);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,11 +56,26 @@ export function CandidatePage() {
 
   if (!page) return null;
 
+  const isAdmin = user?.role === "ADMIN";
   const needsReview = document?.parseStatus === "NEEDS_REVIEW";
   const first = page.total === 0 ? 0 : page.offset + 1;
   const last = Math.min(page.offset + page.limit, page.total);
   const canPrevious = page.offset > 0;
   const canNext = page.offset + page.limit < page.total;
+
+  async function handleGenerate() {
+    if (!document || generating) return;
+    setGenerating(true);
+    setGenerateError(null);
+    try {
+      const created = await generateSeating(document.examId);
+      navigate(`/generations/${created.generationId}`);
+    } catch (err) {
+      setGenerateError(safeGenerateError(err));
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   return (
     <div className="panel">
@@ -135,6 +155,25 @@ export function CandidatePage() {
         </>
       )}
 
+      {generateError && <Alert variant="danger">{generateError}</Alert>}
+
+      {isAdmin && (
+        <div className="form-actions">
+          <button
+            type="button"
+            className="button button--primary"
+            disabled={generating}
+            onClick={() => void handleGenerate()}
+          >
+            {generating ? "Generating seating..." : "Generate seating"}
+          </button>
+          <p className="muted">
+            Generation reconciles this document's candidates against the student
+            master before producing a seating plan.
+          </p>
+        </div>
+      )}
+
       <div className="form-actions">
         <Link className="button button--ghost" to={`/documents/${documentId}`}>
           Back to ingestion status
@@ -142,6 +181,24 @@ export function CandidatePage() {
       </div>
     </div>
   );
+}
+
+function safeGenerateError(err: unknown): string {
+  if (err instanceof ApiError) {
+    switch (err.code) {
+      case "ERR_JOB_ALREADY_ACTIVE":
+        return "A seating generation for this exam is already in progress.";
+      case "MISSING_EXAM_ID":
+        return "Exam information is missing. Please upload the document again.";
+      case "UNAUTHORIZED":
+        return "Your session has expired. Please log in again.";
+      case "NETWORK_ERROR":
+        return "Unable to reach the server. Please try again.";
+      default:
+        return "Something went wrong. Please try again.";
+    }
+  }
+  return "Something went wrong. Please try again.";
 }
 
 function safeCandidateError(err: unknown): string {

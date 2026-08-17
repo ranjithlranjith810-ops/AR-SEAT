@@ -9,6 +9,7 @@
  *   GET  /exam-seating/exams                        -> 200 { exams } (ADMIN)
  *   GET  /exam-seating/generations/:id              -> generation state + domain states
  *   GET  /exam-seating/generations/:id/seating      -> published seating grouped by hall
+ *   GET  /exam-seating/plans/:seatingPlanId         -> seating plan by id (any status)
  *   POST /exam-seating/documents?examId=            -> 200 IngestReport (ADMIN; application/pdf body)
  *   GET  /exam-seating/documents/:id                -> ingestion status (document record)
  *   GET  /exam-seating/documents/:id/candidates     -> validated candidate view (paginated)
@@ -26,7 +27,7 @@ import type {
   GenerateOptions,
 } from "./types";
 import { runSeatingGeneration } from "./integration";
-import { getSeatingPlanForExam } from "./persist";
+import { getSeatingPlanById, getSeatingPlanForExam } from "./persist";
 import { prisma } from "../db";
 import { SeatingError } from "../errors";
 import { getExam, listExams } from "../services/exam.service";
@@ -141,6 +142,14 @@ async function handleRequest(
         return;
       }
       const plan = await getSeatingPlanForExam(result.examId);
+      json(res, 200, serializeSeating(plan));
+      return;
+    }
+
+    const planMatch = path.match(/^\/exam-seating\/plans\/([^/]+)$/);
+    if (method === "GET" && planMatch) {
+      requireAuth(user);
+      const plan = await getSeatingPlanById(planMatch[1]!);
       json(res, 200, serializeSeating(plan));
       return;
     }

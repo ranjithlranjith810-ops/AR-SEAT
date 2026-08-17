@@ -1,8 +1,11 @@
 import type {
   CandidatePage,
   Exam,
+  GenerationCreated,
+  GenerationStatus,
   IngestReport,
   PublicUser,
+  SeatingPlan,
   UploadedDocument,
 } from "./types";
 
@@ -117,4 +120,25 @@ export async function getDocumentCandidates(
 export async function getExams(): Promise<Exam[]> {
   const res = await request<{ exams: Exam[] }>("/exam-seating/exams");
   return res.exams;
+}
+
+export async function generateSeating(examId: string): Promise<GenerationCreated> {
+  return request<GenerationCreated>("/exam-seating/generations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ examId }),
+  });
+}
+
+export async function getGenerationStatus(generationId: string): Promise<GenerationStatus> {
+  return request<GenerationStatus>(
+    `/exam-seating/generations/${encodeURIComponent(generationId)}`,
+  );
+}
+
+export async function getSeatingPlan(seatingPlanId: string): Promise<SeatingPlan> {
+  const res = await request<{ plan: SeatingPlan }>(
+    `/exam-seating/plans/${encodeURIComponent(seatingPlanId)}`,
+  );
+  return res.plan;
 }
