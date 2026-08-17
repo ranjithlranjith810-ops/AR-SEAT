@@ -142,3 +142,19 @@ export async function getSeatingPlan(seatingPlanId: string): Promise<SeatingPlan
   );
   return res.plan;
 }
+
+export async function approveSeatingPlan(seatingPlanId: string): Promise<SeatingPlan> {
+  const res = await request<{ plan: SeatingPlan }>(
+    `/exam-seating/plans/${encodeURIComponent(seatingPlanId)}/approve`,
+    { method: "POST" },
+  );
+  return res.plan;
+}
+
+export async function publishSeatingPlan(seatingPlanId: string): Promise<SeatingPlan> {
+  const res = await request<{ plan: SeatingPlan }>(
+    `/exam-seating/plans/${encodeURIComponent(seatingPlanId)}/publish`,
+    { method: "POST" },
+  );
+  return res.plan;
+}

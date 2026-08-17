@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ApiError, getSeatingPlan } from "../lib/api";
+import { ApiError, approveSeatingPlan, getSeatingPlan, publishSeatingPlan } from "../lib/api";
 import type { SeatingAssignment, SeatingPlan } from "../lib/types";
+import { useAuth } from "../auth/AuthContext";
 import { Alert, PageLoader } from "./ui";
 
 export function SeatingPage() {
   const { seatingPlanId = "" } = useParams();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "ADMIN";
   const [plan, setPlan] = useState<SeatingPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [acting, setActing] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -37,6 +42,26 @@ export function SeatingPage() {
     setLoading(true);
     setReloadKey((k) => k + 1);
   }, []);
+
+  const runAction = useCallback(
+    async (action: "approve" | "publish") => {
+      if (!seatingPlanId || acting) return;
+      setActing(true);
+      setActionError(null);
+      try {
+        const updated =
+          action === "approve"
+            ? await approveSeatingPlan(seatingPlanId)
+            : await publishSeatingPlan(seatingPlanId);
+        setPlan(updated);
+      } catch (err) {
+        setActionError(safePlanActionError(err));
+      } finally {
+        setActing(false);
+      }
+    },
+    [seatingPlanId, acting],
+  );
 
   if (loading && !plan) return <PageLoader label="Loading seating plan..." />;
 
@@ -124,10 +149,32 @@ export function SeatingPage() {
       )}
 
       <div className="form-actions">
+        {isAdmin && plan.status === "DRAFT" && (
+          <button
+            type="button"
+            className="button"
+            disabled={acting}
+            onClick={() => void runAction("approve")}
+          >
+            {acting ? "Approving..." : "Approve plan"}
+          </button>
+        )}
+        {isAdmin && plan.status === "APPROVED" && (
+          <button
+            type="button"
+            className="button"
+            disabled={acting}
+            onClick={() => void runAction("publish")}
+          >
+            {acting ? "Publishing..." : "Publish plan"}
+          </button>
+        )}
         <Link className="button button--ghost" to="/">
           Back to home
         </Link>
       </div>
+
+      {actionError && <Alert variant="danger">{actionError}</Alert>}
     </div>
   );
 }
@@ -135,6 +182,26 @@ export function SeatingPage() {
 function safeSeatingError(err: unknown): string {
   if (err instanceof ApiError) {
     switch (err.code) {
+      case "PLAN_NOT_FOUND":
+        return "Seating plan not found.";
+      case "UNAUTHORIZED":
+        return "Your session has expired. Please log in again.";
+      case "NETWORK_ERROR":
+        return "Unable to reach the server. Please try again.";
+      default:
+        return "Something went wrong. Please try again.";
+    }
+  }
+  return "Something went wrong. Please try again.";
+}
+
+function safePlanActionError(err: unknown): string {
+  if (err instanceof ApiError) {
+    switch (err.code) {
+      case "ALREADY_PUBLISHED":
+        return "This seating plan has already been published.";
+      case "ALREADY_APPROVED":
+        return "This seating plan has already been approved.";
       case "PLAN_NOT_FOUND":
         return "Seating plan not found.";
       case "UNAUTHORIZED":

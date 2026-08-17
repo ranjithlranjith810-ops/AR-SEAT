@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  approveSeatingPlan,
   generateSeating,
   getDocumentCandidates,
   getExams,
@@ -7,6 +8,7 @@ import {
   getMe,
   getSeatingPlan,
   login,
+  publishSeatingPlan,
   uploadDocument,
 } from "./api";
 import type { CandidatePage, GenerationCreated, IngestReport, PublicUser } from "./types";
@@ -207,6 +209,52 @@ describe("api client", () => {
     expect(plan).toMatchObject({ id: "plan-1", status: "DRAFT" });
     const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
     expect(url).toBe("/exam-seating/plans/plan-1");
+  });
+
+  it("approveSeatingPlan POSTs to the approve route and unwraps the plan", async () => {
+    stubFetchOnce({
+      status: 200,
+      body: { plan: { id: "plan-1", examId: "exam-1", version: 1, status: "APPROVED", assignments: [] } },
+    });
+    const plan = await approveSeatingPlan("plan-1");
+    expect(plan).toMatchObject({ id: "plan-1", status: "APPROVED" });
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe("/exam-seating/plans/plan-1/approve");
+    expect(init.method).toBe("POST");
+  });
+
+  it("approveSeatingPlan surfaces 409 ALREADY_APPROVED", async () => {
+    stubFetchOnce({ status: 409, body: { error: "ALREADY_APPROVED" } });
+    await expect(approveSeatingPlan("plan-1")).rejects.toMatchObject({
+      status: 409,
+      code: "ALREADY_APPROVED",
+    });
+  });
+
+  it("publishSeatingPlan POSTs to the publish route and unwraps the plan", async () => {
+    stubFetchOnce({
+      status: 200,
+      body: { plan: { id: "plan-1", examId: "exam-1", version: 1, status: "PUBLISHED", assignments: [] } },
+    });
+    const plan = await publishSeatingPlan("plan-1");
+    expect(plan).toMatchObject({ id: "plan-1", status: "PUBLISHED" });
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe("/exam-seating/plans/plan-1/publish");
+    expect(init.method).toBe("POST");
+  });
+
+  it("publishSeatingPlan surfaces 409 ALREADY_PUBLISHED", async () => {
+    stubFetchOnce({ status: 409, body: { error: "ALREADY_PUBLISHED" } });
+    await expect(publishSeatingPlan("plan-1")).rejects.toMatchObject({
+      status: 409,
+      code: "ALREADY_PUBLISHED",
+    });
   });
 
   it("maps network failure to a NETWORK_ERROR ApiError", async () => {

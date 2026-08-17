@@ -4,15 +4,22 @@ import userEvent from "@testing-library/user-event";
 import { ApiError } from "../lib/api";
 import type { SeatingPlan } from "../lib/types";
 import { SeatingPage } from "./SeatingPage";
-import { renderParamRoute } from "../test/harness";
+import { adminUser, renderParamRoute, staffUser } from "../test/harness";
 
 vi.mock("../lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/api")>();
-  return { ...actual, getSeatingPlan: vi.fn() };
+  return {
+    ...actual,
+    getSeatingPlan: vi.fn(),
+    approveSeatingPlan: vi.fn(),
+    publishSeatingPlan: vi.fn(),
+  };
 });
 
-const { getSeatingPlan } = await import("../lib/api");
+const { approveSeatingPlan, getSeatingPlan, publishSeatingPlan } = await import("../lib/api");
 const mockedGetSeatingPlan = vi.mocked(getSeatingPlan);
+const mockedApproveSeatingPlan = vi.mocked(approveSeatingPlan);
+const mockedPublishSeatingPlan = vi.mocked(publishSeatingPlan);
 
 function plan(overrides: Partial<SeatingPlan> = {}): SeatingPlan {
   return {
@@ -43,6 +50,8 @@ function plan(overrides: Partial<SeatingPlan> = {}): SeatingPlan {
 
 beforeEach(() => {
   mockedGetSeatingPlan.mockReset();
+  mockedApproveSeatingPlan.mockReset();
+  mockedPublishSeatingPlan.mockReset();
 });
 
 describe("SeatingPage", () => {
@@ -133,5 +142,60 @@ describe("SeatingPage", () => {
     for (const marker of ["Prisma", "schema.prisma", "D:\\", "stack", "SQL"]) {
       expect(bodyText).not.toContain(marker);
     }
+  });
+
+  it("renders no approve/publish actions for STAFF even on a DRAFT plan", async () => {
+    mockedGetSeatingPlan.mockResolvedValue(plan());
+    renderParamRoute(<SeatingPage />, "/seating/:seatingPlanId", staffUser, "/seating/plan-1");
+
+    await screen.findByText("DRAFT");
+    expect(screen.queryByRole("button", { name: "Approve plan" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Publish plan" })).not.toBeInTheDocument();
+  });
+
+  it("ADMIN can approve a DRAFT plan and the status updates to APPROVED", async () => {
+    mockedGetSeatingPlan.mockResolvedValue(plan());
+    mockedApproveSeatingPlan.mockResolvedValue(plan({ status: "APPROVED" }));
+    renderParamRoute(<SeatingPage />, "/seating/:seatingPlanId", adminUser, "/seating/plan-1");
+
+    const uploader = userEvent.setup();
+    await uploader.click(await screen.findByRole("button", { name: "Approve plan" }));
+
+    expect(mockedApproveSeatingPlan).toHaveBeenCalledWith("plan-1");
+    expect(await screen.findByText("APPROVED")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Publish plan" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Approve plan" })).not.toBeInTheDocument();
+  });
+
+  it("ADMIN can publish an APPROVED plan and the status updates to PUBLISHED", async () => {
+    mockedGetSeatingPlan.mockResolvedValue(plan({ status: "APPROVED" }));
+    mockedPublishSeatingPlan.mockResolvedValue(plan({ status: "PUBLISHED" }));
+    renderParamRoute(<SeatingPage />, "/seating/:seatingPlanId", adminUser, "/seating/plan-1");
+
+    const uploader = userEvent.setup();
+    await uploader.click(await screen.findByRole("button", { name: "Publish plan" }));
+
+    expect(mockedPublishSeatingPlan).toHaveBeenCalledWith("plan-1");
+    expect(await screen.findByText("PUBLISHED")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Publish plan" })).not.toBeInTheDocument();
+  });
+
+  it("409 ALREADY_PUBLISHED is surfaced as an informative message without leaving the page", async () => {
+    mockedGetSeatingPlan.mockResolvedValue(plan({ status: "APPROVED" }));
+    mockedPublishSeatingPlan.mockRejectedValue(
+      new ApiError(409, "ALREADY_PUBLISHED", "already published"),
+    );
+    renderParamRoute(<SeatingPage />, "/seating/:seatingPlanId", adminUser, "/seating/plan-1");
+
+    const uploader = userEvent.setup();
+    await uploader.click(await screen.findByRole("button", { name: "Publish plan" }));
+
+    expect(
+      await screen.findByText("This seating plan has already been published."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Publish plan" })).toBeInTheDocument();
+    const bodyText = document.body.textContent ?? "";
+    expect(bodyText).not.toContain("already published");
+    expect(bodyText).not.toContain("ALREADY_PUBLISHED");
   });
 });
