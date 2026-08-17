@@ -26,6 +26,11 @@ export function Layout() {
             </li>
             {user?.role === "ADMIN" && (
               <li>
+                <NavLink to="/exams">Exams</NavLink>
+              </li>
+            )}
+            {user?.role === "ADMIN" && (
+              <li>
                 <NavLink to="/upload">Upload documents</NavLink>
               </li>
             )}

@@ -7,11 +7,12 @@ import { renderParamRoute } from "../test/harness";
 
 vi.mock("../lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/api")>();
-  return { ...actual, getDocument: vi.fn() };
+  return { ...actual, getDocument: vi.fn(), getDocumentCandidates: vi.fn() };
 });
 
-const { getDocument } = await import("../lib/api");
+const { getDocument, getDocumentCandidates } = await import("../lib/api");
 const mockedGetDocument = vi.mocked(getDocument);
+const mockedGetDocumentCandidates = vi.mocked(getDocumentCandidates);
 
 function doc(overrides: Partial<UploadedDocument> = {}): UploadedDocument {
   return {
@@ -32,6 +33,7 @@ function doc(overrides: Partial<UploadedDocument> = {}): UploadedDocument {
 
 beforeEach(() => {
   mockedGetDocument.mockReset();
+  mockedGetDocumentCandidates.mockReset();
 });
 
 describe("DocumentStatusPage", () => {
@@ -105,25 +107,49 @@ expect(
     expect(screen.queryByRole("link", { name: "View candidates" })).not.toBeInTheDocument();
   });
 
-  it("shows a partial-processing state for NEEDS_REVIEW with a safe unresolved count", async () => {
+it("shows a partial-processing state for NEEDS_REVIEW with matched and unresolved counts", async () => {
     mockedGetDocument.mockResolvedValue(
       doc({
         parseStatus: "NEEDS_REVIEW",
         parseMetadata: { warnings: [], issues: { STUDENT_NOT_FOUND: 3 } },
       }),
     );
+    mockedGetDocumentCandidates.mockResolvedValue({
+      documentId: "doc-1",
+      total: 3,
+      offset: 0,
+      limit: 1,
+      candidates: [],
+    });
     renderParamRoute(<DocumentStatusPage />, "/documents/:documentId", null);
 
-    expect(await screen.findByText(/partially processed/)).toBeInTheDocument();
-    expect(screen.getByText(/3 flagged rows were not resolved/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "View candidates" })).toBeInTheDocument();
+    expect(await screen.findByText("NEEDS_REVIEW")).toBeInTheDocument();
+    expect(screen.getByText(/partially processed/)).toBeInTheDocument();
+    expect(await screen.findByText("Matched candidates")).toBeInTheDocument();
+    expect(screen.getByText("Unresolved rows")).toBeInTheDocument();
+    expect(
+      screen.getByText(/The document contains 3 rows that could not be matched against the Student Master/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View 3 candidates" })).toBeInTheDocument();
   });
 
-  it("does not fabricate an unresolved count when the backend metadata has none", async () => {
+  it("does not fabricate counts when the backend metadata has none", async () => {
     mockedGetDocument.mockResolvedValue(doc({ parseStatus: "NEEDS_REVIEW", parseMetadata: null }));
+    mockedGetDocumentCandidates.mockResolvedValue({
+      documentId: "doc-1",
+      total: 5,
+      offset: 0,
+      limit: 1,
+      candidates: [],
+    });
     renderParamRoute(<DocumentStatusPage />, "/documents/:documentId", null);
     expect(await screen.findByText(/partially processed/)).toBeInTheDocument();
-    expect(screen.queryByText(/flagged rows were not resolved/)).not.toBeInTheDocument();
+    expect(await screen.findByText("Matched candidates")).toBeInTheDocument();
+    expect(screen.queryByText("Unresolved rows")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/could not be matched against the Student Master/),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View 5 candidates" })).toBeInTheDocument();
   });
 
   it("shows a safe error and Retry for a malformed/unexpected API response", async () => {

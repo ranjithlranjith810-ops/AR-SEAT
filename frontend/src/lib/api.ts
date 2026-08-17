@@ -1,5 +1,6 @@
 import type {
   CandidatePage,
+  Exam,
   IngestReport,
   PublicUser,
   UploadedDocument,
@@ -111,4 +112,9 @@ export async function getDocumentCandidates(
   return request<CandidatePage>(
     `/exam-seating/documents/${encodeURIComponent(id)}/candidates?${query}`,
   );
+}
+
+export async function getExams(): Promise<Exam[]> {
+  const res = await request<{ exams: Exam[] }>("/exam-seating/exams");
+  return res.exams;
 }

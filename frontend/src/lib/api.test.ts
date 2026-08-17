@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getDocumentCandidates, getMe, login, uploadDocument } from "./api";
+import { getDocumentCandidates, getExams, getMe, login, uploadDocument } from "./api";
 import type { CandidatePage, IngestReport, PublicUser } from "./types";
 
 const originalFetch = globalThis.fetch;
@@ -112,6 +112,30 @@ describe("api client", () => {
     expect(page.offset).toBe(40);
     const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
     expect(url).toBe("/exam-seating/documents/doc-1/candidates?limit=20&offset=40");
+  });
+
+  it("getExams fetches the backend exam list", async () => {
+    stubFetchOnce({
+      status: 200,
+      body: {
+        exams: [
+          {
+            id: "exam-1",
+            examDate: "2026-12-03T09:30:00.000Z",
+            session: "FN",
+            examType: "MODEL",
+            status: "DRAFT",
+            createdAt: "2026-08-17T06:00:00.000Z",
+            updatedAt: "2026-08-17T06:00:01.000Z",
+          },
+        ],
+      },
+    });
+    const exams = await getExams();
+    expect(exams).toHaveLength(1);
+    expect(exams[0]).toMatchObject({ id: "exam-1", session: "FN", examType: "MODEL", status: "DRAFT" });
+    const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url).toBe("/exam-seating/exams");
   });
 
   it("maps network failure to a NETWORK_ERROR ApiError", async () => {

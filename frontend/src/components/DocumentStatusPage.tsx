@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ApiError, getDocument } from "../lib/api";
+import { ApiError, getDocument, getDocumentCandidates } from "../lib/api";
 import type { UploadedDocument } from "../lib/types";
 import { isTerminalStatus } from "../lib/types";
 import { Alert, PageLoader, StatusBadge } from "./ui";
 
 const POLL_MS = 3000;
+const COUNT_PAGE_SIZE = 1;
 
 export function DocumentStatusPage() {
   const { documentId = "" } = useParams();
@@ -13,6 +14,7 @@ export function DocumentStatusPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [matchedCount, setMatchedCount] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,6 +46,21 @@ export function DocumentStatusPage() {
       if (timer) clearTimeout(timer);
     };
   }, [documentId, reloadKey]);
+
+useEffect(() => {
+    if (document?.parseStatus !== "NEEDS_REVIEW") return;
+    let cancelled = false;
+    setMatchedCount(null);
+    Promise.resolve()
+      .then(() => getDocumentCandidates(documentId, COUNT_PAGE_SIZE, 0))
+      .then((data) => {
+        if (!cancelled) setMatchedCount(data.total);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [documentId, document?.parseStatus]);
 
   const retry = useCallback(() => {
     setError(null);
@@ -84,14 +101,44 @@ export function DocumentStatusPage() {
         </Alert>
       )}
       {needsReview && (
-        <Alert variant="warning">
-          <p>
-            This document is partially processed. The unresolved rows require
-            attention before the document is considered fully ready for the next
-            workflow step.
-            {unresolved !== null && ` ${unresolved} flagged row${unresolved === 1 ? "" : "s"} were not resolved.`}
-          </p>
-        </Alert>
+        <div className="alert alert--warning review-summary" role="status">
+          <div className="alert__title">NEEDS_REVIEW</div>
+          <div className="alert__body">
+            <dl className="review-counts">
+              {matchedCount !== null && (
+                <div>
+                  <dt>Matched candidates</dt>
+                  <dd>{matchedCount}</dd>
+                </div>
+              )}
+              {unresolved !== null && (
+                <div>
+                  <dt>Unresolved rows</dt>
+                  <dd>{unresolved}</dd>
+                </div>
+              )}
+            </dl>
+            <p>
+              This document is partially processed. The unresolved rows require
+              attention before the document is considered fully ready for the
+              next workflow step.
+            </p>
+            {unresolved !== null && (
+              <p>
+                The document contains {unresolved} row{unresolved === 1 ? "" : "s"} that
+                could not be matched against the Student Master.
+              </p>
+            )}
+            <div className="form-actions">
+              <Link
+                className="button button--primary"
+                to={`/documents/${document.id}/candidates`}
+              >
+                {matchedCount !== null ? `View ${matchedCount} candidates` : "View candidates"}
+              </Link>
+            </div>
+          </div>
+        </div>
       )}
       {rejected && (
         <Alert variant="warning">
@@ -146,7 +193,7 @@ export function DocumentStatusPage() {
         <p className="muted">Reason: {document.parseMetadata}</p>
       )}
 
-      {!failed && !rejected && (
+      {document.parseStatus === "PARSED" && (
         <div className="form-actions">
           <Link className="button button--primary" to={`/documents/${document.id}/candidates`}>
             View candidates

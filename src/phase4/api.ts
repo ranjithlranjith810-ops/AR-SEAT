@@ -6,6 +6,7 @@
  *   POST /auth/logout                               -> 200 { ok } + expired cookie
  *   GET  /auth/me                                   -> 200 { user } (authenticated)
  *   POST /exam-seating/generations                  -> 202 { generationId, state, pollUrl } (ADMIN)
+ *   GET  /exam-seating/exams                        -> 200 { exams } (ADMIN)
  *   GET  /exam-seating/generations/:id              -> generation state + domain states
  *   GET  /exam-seating/generations/:id/seating      -> published seating grouped by hall
  *   POST /exam-seating/documents?examId=            -> 200 IngestReport (ADMIN; application/pdf body)
@@ -28,7 +29,7 @@ import { runSeatingGeneration } from "./integration";
 import { getSeatingPlanForExam } from "./persist";
 import { prisma } from "../db";
 import { SeatingError } from "../errors";
-import { getExam } from "../services/exam.service";
+import { getExam, listExams } from "../services/exam.service";
 import { getDocument } from "../services/exam-document/document.service";
 import { ingestExamDocument } from "../services/exam-document/ingest";
 import {
@@ -108,6 +109,12 @@ async function handleRequest(
     if (method === "POST" && path === "/exam-seating/generations") {
       const actor = requireAdmin(user);
       await handleCreateGeneration(req, res, options, actor.id);
+      return;
+    }
+
+    if (method === "GET" && path === "/exam-seating/exams") {
+      requireAdmin(user);
+      await handleListExams(res);
       return;
     }
 
@@ -362,6 +369,31 @@ async function handleGetDocument(
 ) {
   const document = await getDocument(id);
   json(res, 200, { document: serializeDocument(document) });
+}
+
+async function handleListExams(res: import("node:http").ServerResponse) {
+  const exams = await listExams();
+  json(res, 200, { exams: exams.map(serializeExam) });
+}
+
+function serializeExam(exam: {
+  id: string;
+  examDate: Date;
+  session: string;
+  examType: string;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: exam.id,
+    examDate: exam.examDate,
+    session: exam.session,
+    examType: exam.examType,
+    status: exam.status,
+    createdAt: exam.createdAt,
+    updatedAt: exam.updatedAt,
+  };
 }
 
 async function handleGetDocumentCandidates(

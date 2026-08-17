@@ -52,6 +52,10 @@ export async function getExam(id: string) {
   return exam;
 }
 
+export async function listExams() {
+  return prisma.exam.findMany({ orderBy: { examDate: "desc" } });
+}
+
 export async function transitionExamStatus(
   id: string,
   to: ExamStatus,

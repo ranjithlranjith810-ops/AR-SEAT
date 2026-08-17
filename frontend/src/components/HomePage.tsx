@@ -19,8 +19,8 @@ export function HomePage() {
         </ol>
       </div>
       {user?.role === "ADMIN" && (
-        <Link className="button button--primary" to="/upload">
-          Upload a document
+        <Link className="button button--primary" to="/exams">
+          Select an exam and upload
         </Link>
       )}
       {user?.role === "STAFF" && (

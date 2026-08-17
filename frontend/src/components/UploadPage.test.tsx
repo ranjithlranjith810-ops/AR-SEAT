@@ -1,11 +1,13 @@
 ﻿import { describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import { ApiError } from "../lib/api";
-import type { IngestReport } from "../lib/types";
+import type { Exam, IngestReport } from "../lib/types";
 import { RequireAdmin } from "../auth/guards";
 import { UploadPage } from "./UploadPage";
-import { adminUser, renderWithAuth, staffUser } from "../test/harness";
+import { adminUser, noopAuth, renderWithAuth, staffUser } from "../test/harness";
+import { AuthContext } from "../auth/AuthContext";
 
 vi.mock("../lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/api")>();
@@ -28,6 +30,31 @@ function parsedReport(overrides: Partial<IngestReport> = {}): IngestReport {
     fileName: "list.pdf",
     ...overrides,
   };
+}
+
+function exam(overrides: Partial<Exam> = {}): Exam {
+  return {
+    id: "exam-1",
+    examDate: "2026-12-03T09:30:00.000Z",
+    session: "FN",
+    examType: "MODEL",
+    status: "DRAFT",
+    createdAt: "2026-08-17T06:00:00.000Z",
+    updatedAt: "2026-08-17T06:00:01.000Z",
+    ...overrides,
+  };
+}
+
+function renderWithExamSelection() {
+  return render(
+    <AuthContext.Provider value={{ ...noopAuth, user: adminUser }}>
+      <MemoryRouter
+        initialEntries={[{ pathname: "/upload", state: { examId: "exam-1", exam: exam() } }]}
+      >
+        <UploadPage />
+      </MemoryRouter>
+    </AuthContext.Provider>,
+  );
 }
 
 const PDF_BYTES = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]);
@@ -66,13 +93,39 @@ describe("UploadPage", () => {
     expect(screen.queryByRole("heading", { name: "Upload a document" })).not.toBeInTheDocument();
   });
 
-  it("shows the selected filename and size, then the ready-to-upload state", async () => {
+it("shows the selected filename and size, then the ready-to-upload state", async () => {
     const uploader = userEvent.setup();
     renderWithAuth(<UploadPage />, adminUser);
     expect(screen.getByText("No document selected")).toBeInTheDocument();
     await uploader.upload(screen.getByLabelText("PDF file"), pdfFile("candidate-list.pdf"));
     expect(screen.getByText(/candidate-list\.pdf/)).toBeInTheDocument();
     expect(screen.getByText(/Ready to upload/)).toBeInTheDocument();
+  });
+
+  it("prefills a backend-selected exam and shows its context", () => {
+    renderWithExamSelection();
+    expect(screen.getByRole("heading", { name: "Selected exam" })).toBeInTheDocument();
+    expect(screen.getByText("exam-1")).toBeInTheDocument();
+    expect(screen.getByText("FN")).toBeInTheDocument();
+    expect(screen.getByText("MODEL")).toBeInTheDocument();
+    expect(screen.getByText("DRAFT")).toBeInTheDocument();
+    expect(screen.getByLabelText("Exam ID")).toBeDisabled();
+    expect(screen.getByRole("link", { name: "Change exam" })).toHaveAttribute("href", "/exams");
+  });
+
+  it("submits the preselected exam ID without manual entry", async () => {
+    mockedUpload.mockResolvedValue(parsedReport());
+    renderWithExamSelection();
+
+    const uploader = userEvent.setup();
+    await uploader.upload(screen.getByLabelText("PDF file"), pdfFile());
+    await uploader.click(screen.getByRole("button", { name: "Upload document" }));
+
+    await waitFor(() => {
+      expect(mockedUpload).toHaveBeenCalledTimes(1);
+    });
+    expect(mockedUpload.mock.calls[0]![0]).toBe("exam-1");
+    expect(await screen.findByText(/Processing complete/)).toBeInTheDocument();
   });
 
   it("submits to the Phase 9 endpoint with the exam ID and file and surfaces the document ID", async () => {

@@ -1,7 +1,7 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ApiError, uploadDocument } from "../lib/api";
-import type { DocumentParseStatus, IngestReport } from "../lib/types";
+import type { DocumentParseStatus, Exam, IngestReport } from "../lib/types";
 import { isTerminalStatus } from "../lib/types";
 import { Alert } from "./ui";
 
@@ -39,9 +39,18 @@ function phaseFromStatus(status: DocumentParseStatus): Phase {
 
 export function UploadPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [examId, setExamId] = useState("");
+  const selection = location.state as { examId?: unknown; exam?: Exam } | null;
+  const preselectedExam: Exam | null =
+    selection && typeof selection.examId === "string" && selection.exam
+      ? selection.exam
+      : null;
+
+  const [examId, setExamId] = useState(() =>
+    selection && typeof selection.examId === "string" ? selection.examId : "",
+  );
   const [file, setFile] = useState<SelectedFile | null>(null);
   const [phase, setPhase] = useState<Phase>("empty");
   const [report, setReport] = useState<IngestReport | null>(null);
@@ -121,6 +130,37 @@ export function UploadPage() {
         database.
       </p>
 
+      {preselectedExam && (
+        <div className="panel panel--inset">
+          <h2>Selected exam</h2>
+          <dl className="detail-list">
+            <div>
+              <dt>Exam ID</dt>
+              <dd>{preselectedExam.id}</dd>
+            </div>
+            <div>
+              <dt>Date</dt>
+              <dd>{formatDate(preselectedExam.examDate)}</dd>
+            </div>
+            <div>
+              <dt>Session</dt>
+              <dd>{preselectedExam.session}</dd>
+            </div>
+            <div>
+              <dt>Exam type</dt>
+              <dd>{preselectedExam.examType}</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd>{preselectedExam.status}</dd>
+            </div>
+          </dl>
+          <Link className="button button--ghost" to="/exams">
+            Change exam
+          </Link>
+        </div>
+      )}
+
       {phase === "failed" && (
         <Alert variant="danger">
           <p>{error}</p>
@@ -182,7 +222,7 @@ export function UploadPage() {
             name="examId"
             value={examId}
             onChange={(e) => setExamId(e.target.value)}
-            disabled={busy}
+            disabled={busy || Boolean(preselectedExam)}
             placeholder="Exam identifier (UUID)"
             autoComplete="off"
             aria-describedby={error && phase === "selected" ? "upload-error" : undefined}
@@ -279,6 +319,11 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDate(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
 }
 
 function safeUploadError(err: unknown): string {

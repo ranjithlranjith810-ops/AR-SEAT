@@ -6,6 +6,29 @@ export interface PublicUser {
   role: Role;
 }
 
+export type ExamSession = "FN" | "AN";
+
+export type ExamType = "UNIVERSITY" | "INTERNAL" | "MODEL";
+
+export type ExamStatus =
+  | "DRAFT"
+  | "READY"
+  | "GENERATING"
+  | "GENERATED"
+  | "APPROVED"
+  | "PUBLISHED"
+  | "CANCELLED";
+
+export interface Exam {
+  id: string;
+  examDate: string;
+  session: ExamSession;
+  examType: ExamType;
+  status: ExamStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type DocumentParseStatus =
   | "UPLOADED"
   | "PROCESSING"

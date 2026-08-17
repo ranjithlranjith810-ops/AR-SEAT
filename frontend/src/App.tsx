@@ -3,6 +3,7 @@ import { AuthProvider } from "./auth/AuthContext";
 import { RequireAdmin, RequireAuth } from "./auth/guards";
 import { CandidatePage } from "./components/CandidatePage";
 import { DocumentStatusPage } from "./components/DocumentStatusPage";
+import { ExamSelectionPage } from "./components/ExamSelectionPage";
 import { HomePage } from "./components/HomePage";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./components/LoginPage";
@@ -31,6 +32,14 @@ export default function App() {
             }
           >
             <Route path="/" element={<HomePage />} />
+            <Route
+              path="/exams"
+              element={
+                <RequireAdmin>
+                  <ExamSelectionPage />
+                </RequireAdmin>
+              }
+            />
             <Route
               path="/upload"
               element={
