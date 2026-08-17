@@ -278,4 +278,25 @@ expect(createRes.status).not.toBe(401);
     expect((res.body as { error: string }).error).toBe("INVALID_CREDENTIALS");
     expect(res.token).toBeNull();
   });
+
+  it("Test H â€” percent-encoded generation ids resolve in the registry", async () => {
+    const loginResult = await login(ADMIN_USERNAME, ADMIN_PASSWORD);
+    expect(loginResult.token).toBeTruthy();
+
+    const exam = await createExam({ examDate: new Date("2026-12-04T09:30:00Z"), session: "FN" }, "test-actor");
+    const encodedId = "gen:colon-id-" + Date.now();
+    registry.set(encodedId, makeStubResult(exam.id, encodedId));
+
+    const encodedPath = `/exam-seating/generations/${encodeURIComponent(encodedId)}`;
+    const statusRes = await authedFetch(encodedPath, loginResult.token);
+    expect(statusRes.status).toBe(200);
+    const status = await jsonBody<{ state: string }>(statusRes);
+    expect(status.state).toBe("COMPLETED");
+
+    const seatingRes = await authedFetch(`${encodedPath}/seating`, loginResult.token);
+    // The encoded id resolved in the registry (otherwise GENERATION_NOT_FOUND);
+    // this exam has no plan, so the intentional Phase 7c PLAN_NOT_FOUND contract applies.
+    expect(seatingRes.status).toBe(404);
+    expect((await jsonBody<{ error: string }>(seatingRes)).error).toBe("PLAN_NOT_FOUND");
+  });
 });

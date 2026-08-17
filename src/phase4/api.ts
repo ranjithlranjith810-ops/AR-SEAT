@@ -72,6 +72,14 @@ class HttpError extends Error {
   }
 }
 
+function decodePathSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+}
+
 export interface Phase4ApiOptions extends GenerateOptions {
   registry: GenerationRegistry;
   requestedBy?: string;
@@ -129,7 +137,7 @@ async function handleRequest(
     const generationMatch = path.match(/^\/exam-seating\/generations\/([^/]+)$/);
     if (method === "GET" && generationMatch) {
       requireAuth(user);
-      const generationId = generationMatch[1]!;
+      const generationId = decodePathSegment(generationMatch[1]!);
       const result = options.registry.get(generationId);
       if (!result) {
         json(res, 404, { error: "GENERATION_NOT_FOUND", message: `generation ${generationId} not found` });
@@ -142,7 +150,7 @@ async function handleRequest(
     const seatingMatch = path.match(/^\/exam-seating\/generations\/([^/]+)\/seating$/);
     if (method === "GET" && seatingMatch) {
       requireAuth(user);
-      const generationId = seatingMatch[1]!;
+      const generationId = decodePathSegment(seatingMatch[1]!);
       const result = options.registry.get(generationId);
       if (!result) {
         json(res, 404, { error: "GENERATION_NOT_FOUND", message: `generation ${generationId} not found` });
@@ -376,6 +384,8 @@ function serializeGeneration(result: GenerationResult) {
           seatingPlanId: result.plan.seatingPlanId,
           version: result.plan.version,
           solverStatus: result.plan.solverStatus,
+          assignedCount: result.plan.assignedCount,
+          unassignedCount: result.plan.unassignedCount,
         }
       : null,
   };

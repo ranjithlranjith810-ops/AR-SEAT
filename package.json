@@ -27,6 +27,7 @@
     "pdfjs-dist": "^6.2.108"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "^24.0.0",
     "@types/pg": "^8.11.10",
     "pdf-lib": "^1.17.1",
