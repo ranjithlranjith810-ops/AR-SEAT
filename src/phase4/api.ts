@@ -10,6 +10,8 @@
  *   GET  /exam-seating/generations/:id              -> generation state + domain states
  *   GET  /exam-seating/generations/:id/seating      -> published seating grouped by hall
  *   GET  /exam-seating/plans/:seatingPlanId         -> seating plan by id (any status)
+ *   POST /exam-seating/plans/:seatingPlanId/approve -> 200 plan (ADMIN; DRAFT -> APPROVED)
+ *   POST /exam-seating/plans/:seatingPlanId/publish -> 200 plan (ADMIN; APPROVED -> PUBLISHED)
  *   POST /exam-seating/documents?examId=            -> 200 IngestReport (ADMIN; application/pdf body)
  *   GET  /exam-seating/documents/:id                -> ingestion status (document record)
  *   GET  /exam-seating/documents/:id/candidates     -> validated candidate view (paginated)
@@ -31,6 +33,7 @@ import { getSeatingPlanById, getSeatingPlanForExam } from "./persist";
 import { prisma } from "../db";
 import { SeatingError } from "../errors";
 import { getExam, listExams } from "../services/exam.service";
+import { approvePlan, publishPlan } from "../services/seatingPlan.service";
 import { getDocument } from "../services/exam-document/document.service";
 import { ingestExamDocument } from "../services/exam-document/ingest";
 import {
@@ -154,6 +157,20 @@ async function handleRequest(
       return;
     }
 
+    const planApproveMatch = path.match(/^\/exam-seating\/plans\/([^/]+)\/approve$/);
+    if (method === "POST" && planApproveMatch) {
+      const actor = requireAdmin(user);
+      await handleApprovePlan(res, planApproveMatch[1]!, actor.id);
+      return;
+    }
+
+    const planPublishMatch = path.match(/^\/exam-seating\/plans\/([^/]+)\/publish$/);
+    if (method === "POST" && planPublishMatch) {
+      const actor = requireAdmin(user);
+      await handlePublishPlan(res, planPublishMatch[1]!, actor.id);
+      return;
+    }
+
     const documentCandidatesMatch = path.match(/^\/exam-seating\/documents\/([^/]+)\/candidates$/);
     if (method === "GET" && documentCandidatesMatch) {
       requireAuth(user);
@@ -194,6 +211,18 @@ async function handleRequest(
     }
     if (error instanceof SeatingError && error.code === "DOCUMENT_NOT_FOUND") {
       json(res, 404, { error: "DOCUMENT_NOT_FOUND" });
+      return;
+    }
+    if (error instanceof SeatingError && error.code === "ALREADY_APPROVED") {
+      json(res, 409, { error: "ALREADY_APPROVED" });
+      return;
+    }
+    if (error instanceof SeatingError && error.code === "ALREADY_PUBLISHED") {
+      json(res, 409, { error: "ALREADY_PUBLISHED" });
+      return;
+    }
+    if (error instanceof SeatingError && error.code === "INVALID_PLAN_STATUS_TRANSITION") {
+      json(res, 409, { error: error.code, message: error.message });
       return;
     }
     console.error("[api] unexpected error", error);
@@ -328,6 +357,26 @@ function serializeGeneration(result: GenerationResult) {
 
 function serializeSeating(plan: unknown) {
   return { plan };
+}
+
+async function handleApprovePlan(
+  res: import("node:http").ServerResponse,
+  id: string,
+  actorId: string,
+) {
+  await approvePlan(id, actorId);
+  const plan = await getSeatingPlanById(id);
+  json(res, 200, serializeSeating(plan));
+}
+
+async function handlePublishPlan(
+  res: import("node:http").ServerResponse,
+  id: string,
+  actorId: string,
+) {
+  await publishPlan(id, actorId);
+  const plan = await getSeatingPlanById(id);
+  json(res, 200, serializeSeating(plan));
 }
 
 async function handleUploadDocument(

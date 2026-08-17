@@ -68,6 +68,9 @@ export async function createPlan(examId: string, createdBy?: string) {
 
 export async function approvePlan(id: string, approvedBy?: string) {
   const plan = await getPlan(id);
+  if (plan.status === "APPROVED") {
+    throw new SeatingError("Seating plan is already approved", "ALREADY_APPROVED");
+  }
   assertPlanTransition(plan.status, "APPROVED");
   const updated = await prisma.seatingPlan.update({
     where: { id },
@@ -84,6 +87,9 @@ export async function approvePlan(id: string, approvedBy?: string) {
 
 export async function publishPlan(id: string, publishedBy?: string) {
   const plan = await getPlan(id);
+  if (plan.status === "PUBLISHED") {
+    throw new SeatingError("Seating plan is already published", "ALREADY_PUBLISHED");
+  }
   assertPlanTransition(plan.status, "PUBLISHED");
 
   const otherPublished = await prisma.seatingPlan.findFirst({
