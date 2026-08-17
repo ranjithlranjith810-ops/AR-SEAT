@@ -1,6 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getDocumentCandidates, getExams, getMe, login, uploadDocument } from "./api";
-import type { CandidatePage, IngestReport, PublicUser } from "./types";
+import {
+  generateSeating,
+  getDocumentCandidates,
+  getExams,
+  getGenerationStatus,
+  getMe,
+  getSeatingPlan,
+  login,
+  uploadDocument,
+} from "./api";
+import type { CandidatePage, GenerationCreated, IngestReport, PublicUser } from "./types";
 
 const originalFetch = globalThis.fetch;
 
@@ -136,6 +145,68 @@ describe("api client", () => {
     expect(exams[0]).toMatchObject({ id: "exam-1", session: "FN", examType: "MODEL", status: "DRAFT" });
     const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
     expect(url).toBe("/exam-seating/exams");
+  });
+
+  it("generateSeating posts the examId to the generations endpoint", async () => {
+    const created: GenerationCreated = {
+      generationId: "gen-1",
+      state: "COMPLETED",
+      pollUrl: "/exam-seating/generations/gen-1",
+      jobId: "job-1",
+    };
+    stubFetchOnce({ status: 200, body: created });
+    const result = await generateSeating("exam-1");
+    expect(result).toEqual(created);
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe("/exam-seating/generations");
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe(JSON.stringify({ examId: "exam-1" }));
+  });
+
+  it("generateSeating surfaces a duplicate-generation 409 as ERR_JOB_ALREADY_ACTIVE", async () => {
+    stubFetchOnce({
+      status: 409,
+      body: { error: "ERR_JOB_ALREADY_ACTIVE", message: "active generation already exists" },
+    });
+    await expect(generateSeating("exam-1")).rejects.toMatchObject({
+      status: 409,
+      code: "ERR_JOB_ALREADY_ACTIVE",
+    });
+  });
+
+  it("getGenerationStatus fetches the encoded generation id", async () => {
+    stubFetchOnce({
+      status: 200,
+      body: { generationId: "gen/1", state: "COMPLETED", sessionCandidateCount: 0, plan: null },
+    });
+    const status = await getGenerationStatus("gen/1");
+    expect(status.state).toBe("COMPLETED");
+    const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url).toBe("/exam-seating/generations/gen%2F1");
+  });
+
+  it("getSeatingPlan unwraps the plan payload from the plan-by-id route", async () => {
+    stubFetchOnce({
+      status: 200,
+      body: {
+        plan: {
+          id: "plan-1",
+          examId: "exam-1",
+          version: 1,
+          status: "DRAFT",
+          createdAt: "2026-08-17T06:00:00.000Z",
+          updatedAt: "2026-08-17T06:00:01.000Z",
+          assignments: [],
+        },
+      },
+    });
+    const plan = await getSeatingPlan("plan-1");
+    expect(plan).toMatchObject({ id: "plan-1", status: "DRAFT" });
+    const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url).toBe("/exam-seating/plans/plan-1");
   });
 
   it("maps network failure to a NETWORK_ERROR ApiError", async () => {
