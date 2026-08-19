@@ -97,6 +97,21 @@ enum AuditAction {
   PLAN_APPROVED
   PLAN_PUBLISHED
   PLAN_SUPERSEDED
+  STUDENT_CREATED
+  STUDENT_UPDATED
+  STUDENT_STATUS_CHANGED
+  DEPARTMENT_CREATED
+  DEPARTMENT_UPDATED
+  CLASS_CREATED
+  CLASS_UPDATED
+  HALL_CREATED
+  HALL_UPDATED
+  HALL_STATUS_CHANGED
+  BENCH_CREATED
+  BENCH_UPDATED
+  BENCH_STATUS_CHANGED
+  BENCH_SEAT_ASSIGNED
+  BENCH_SEAT_REMOVED
 }
 
 enum UserRole {
@@ -234,6 +249,7 @@ model Hall {
   createdAt DateTime      @default(now()) @map("created_at")
   updatedAt DateTime      @updatedAt @map("updated_at")
   seats     HallSeat[]
+  benches   Bench[]
   seatAssignments SeatAssignment[]
 
   @@map("halls")
@@ -242,6 +258,7 @@ model Hall {
 model HallSeat {
   id              String           @id @default(uuid()) @map("id")
   hallId          String           @map("hall_id")
+  benchId         String?          @map("bench_id")
   seatPosition    String           @map("seat_position")
   row             String           @map("row")
   column          Int              @map("column")
@@ -249,12 +266,29 @@ model HallSeat {
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
   hall            Hall             @relation(fields: [hallId], references: [id])
+  bench           Bench?           @relation(fields: [benchId], references: [id])
   seatAssignments SeatAssignment[]
 
   @@index([hallId])
+  @@index([benchId])
   @@index([isActive])
   @@unique([hallId, seatPosition])
   @@map("hall_seats")
+}
+
+model Bench {
+  id          String    @id @default(uuid()) @map("id")
+  hallId      String    @map("hall_id")
+  benchNumber String    @map("bench_number")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  hall        Hall      @relation(fields: [hallId], references: [id])
+  seats       HallSeat[]
+
+  @@index([hallId])
+  @@unique([hallId, benchNumber])
+  @@map("benches")
 }
 
 model SeatingPlan {

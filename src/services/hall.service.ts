@@ -50,6 +50,41 @@ export async function getHall(id: string) {
   return hall;
 }
 
+export async function listHalls() {
+  return prisma.hall.findMany({
+    orderBy: { hallNumber: "asc" },
+    include: {
+      seats: {
+        orderBy: [{ row: "asc" }, { column: "asc" }],
+        select: { id: true, benchId: true, seatPosition: true, row: true, column: true, isActive: true },
+      },
+      benches: {
+        orderBy: { benchNumber: "asc" },
+        include: {
+          seats: {
+            orderBy: [{ row: "asc" }, { column: "asc" }],
+            select: { id: true, benchId: true, seatPosition: true, row: true, column: true, isActive: true },
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function updateHall(
+  id: string,
+  patch: { name?: string; building?: string | null; isActive?: boolean },
+) {
+  await getHall(id);
+  if (Object.keys(patch).length === 0) {
+    throw new SeatingError("at least one field must be provided", "INVALID_INPUT");
+  }
+  return prisma.hall.update({
+    where: { id },
+    data: { name: patch.name, building: patch.building, isActive: patch.isActive },
+  });
+}
+
 export async function deriveHallCapacity(hallId: string): Promise<number> {
   return prisma.hallSeat.count({ where: { hallId, isActive: true } });
 }

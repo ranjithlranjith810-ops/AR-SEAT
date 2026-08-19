@@ -1,12 +1,22 @@
 import type {
+  AuditLogPage,
   Candidate,
   CandidatePage,
+  ClassItem,
+  Department,
   Exam,
   GenerationCreated,
   GenerationStatus,
+  Gender,
+  Hall,
+  HallBench,
+  HallSeat,
   IngestReport,
   PublicUser,
   SeatingPlan,
+  Student,
+  StudentPage,
+  StudentStatus,
   UploadedDocument,
 } from "./types";
 
@@ -169,4 +179,260 @@ export async function publishSeatingPlan(seatingPlanId: string): Promise<Seating
     { method: "POST" },
   );
   return res.plan;
+}
+
+export interface AuditLogQuery {
+  limit?: number;
+  offset?: number;
+  action?: string;
+  entityType?: string;
+  entityId?: string;
+  actorId?: string;
+  from?: string;
+  to?: string;
+}
+
+export async function getAuditLogs(query: AuditLogQuery = {}): Promise<AuditLogPage> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== "") params.set(key, String(value));
+  }
+  const qs = params.toString();
+  return request<AuditLogPage>(`/exam-seating/audit-logs${qs ? `?${qs}` : ""}`);
+}
+
+export interface StudentListQuery {
+  search?: string;
+  departmentId?: string;
+  classId?: string;
+  status?: StudentStatus;
+  limit?: number;
+  offset?: number;
+}
+
+export async function listStudents(query: StudentListQuery = {}): Promise<StudentPage> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== "") params.set(key, String(value));
+  }
+  const qs = params.toString();
+  return request<StudentPage>(`/exam-seating/students${qs ? `?${qs}` : ""}`);
+}
+
+export async function getStudent(id: string): Promise<Student> {
+  const res = await request<{ student: Student }>(`/exam-seating/students/${encodeURIComponent(id)}`);
+  return res.student;
+}
+
+export interface StudentInput {
+  name: string;
+  rollNumber: string;
+  registerNumber: string;
+  gender: Gender;
+  classId: string;
+  status: StudentStatus;
+}
+
+export async function createStudent(input: StudentInput): Promise<Student> {
+  const res = await request<{ student: Student }>("/exam-seating/students", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return res.student;
+}
+
+export async function updateStudent(id: string, patch: Partial<StudentInput>): Promise<Student> {
+  const res = await request<{ student: Student }>(
+    `/exam-seating/students/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    },
+  );
+  return res.student;
+}
+
+export async function changeStudentStatus(id: string, status: StudentStatus): Promise<Student> {
+  const res = await request<{ student: Student }>(
+    `/exam-seating/students/${encodeURIComponent(id)}/status`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    },
+  );
+  return res.student;
+}
+
+export async function listDepartments(): Promise<Department[]> {
+  const res = await request<{ departments: Department[] }>("/exam-seating/departments");
+  return res.departments;
+}
+
+export async function createDepartment(input: { code: string; name: string }): Promise<Department> {
+  const res = await request<{ department: Department }>("/exam-seating/departments", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return res.department;
+}
+
+export async function updateDepartment(
+  id: string,
+  patch: { code?: string; name?: string },
+): Promise<Department> {
+  const res = await request<{ department: Department }>(
+    `/exam-seating/departments/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    },
+  );
+  return res.department;
+}
+
+export interface ClassInput {
+  departmentId: string;
+  name: string;
+  year: number;
+  section: string;
+  academicYear: string;
+}
+
+export async function listClasses(departmentId?: string): Promise<ClassItem[]> {
+  const qs = departmentId ? `?departmentId=${encodeURIComponent(departmentId)}` : "";
+  const res = await request<{ classes: ClassItem[] }>(`/exam-seating/classes${qs}`);
+  return res.classes;
+}
+
+export async function createClass(input: ClassInput): Promise<ClassItem> {
+  const res = await request<{ class: ClassItem }>("/exam-seating/classes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return res.class;
+}
+
+export async function updateClass(id: string, patch: Partial<ClassInput>): Promise<ClassItem> {
+  const res = await request<{ class: ClassItem }>(
+    `/exam-seating/classes/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    },
+  );
+  return res.class;
+}
+
+export async function listHalls(): Promise<Hall[]> {
+  const res = await request<{ halls: Hall[] }>("/exam-seating/halls");
+  return res.halls;
+}
+
+export interface HallInput {
+  hallNumber: string;
+  name: string;
+  building?: string | null;
+  rows: number;
+  columns: number;
+}
+
+export async function createHall(input: HallInput): Promise<Hall> {
+  const res = await request<{ hall: Hall }>("/exam-seating/halls", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return res.hall;
+}
+
+export async function updateHall(
+  id: string,
+  patch: { name?: string; building?: string | null; isActive?: boolean },
+): Promise<Hall> {
+  const res = await request<{ hall: Hall }>(
+    `/exam-seating/halls/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    },
+  );
+  return res.hall;
+}
+
+export interface BenchInput {
+  benchNumber: string;
+  isActive?: boolean;
+}
+
+export async function listBenches(hallId: string): Promise<HallBench[]> {
+  const res = await request<{ hallId: string; benches: HallBench[] }>(
+    `/exam-seating/halls/${encodeURIComponent(hallId)}/benches`,
+  );
+  return res.benches;
+}
+
+export async function createBench(hallId: string, input: BenchInput): Promise<HallBench> {
+  const res = await request<{ bench: HallBench }>(
+    `/exam-seating/halls/${encodeURIComponent(hallId)}/benches`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
+  return res.bench;
+}
+
+export async function updateBench(
+  id: string,
+  patch: { benchNumber?: string; isActive?: boolean },
+): Promise<HallBench> {
+  const res = await request<{ bench: HallBench }>(
+    `/exam-seating/benches/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    },
+  );
+  return res.bench;
+}
+
+export async function setBenchActive(id: string, isActive: boolean): Promise<HallBench> {
+  const res = await request<{ bench: HallBench }>(
+    `/exam-seating/benches/${encodeURIComponent(id)}/status`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isActive }),
+    },
+  );
+  return res.bench;
+}
+
+export async function assignSeatToBench(benchId: string, hallSeatId: string): Promise<HallSeat> {
+  const res = await request<{ hallSeat: HallSeat }>(
+    `/exam-seating/benches/${encodeURIComponent(benchId)}/seats/${encodeURIComponent(hallSeatId)}`,
+    { method: "POST" },
+  );
+  return res.hallSeat;
+}
+
+export async function removeSeatFromBench(
+  benchId: string,
+  hallSeatId: string,
+): Promise<HallSeat> {
+  const res = await request<{ hallSeat: HallSeat }>(
+    `/exam-seating/benches/${encodeURIComponent(benchId)}/seats/${encodeURIComponent(hallSeatId)}`,
+    { method: "DELETE" },
+  );
+  return res.hallSeat;
 }

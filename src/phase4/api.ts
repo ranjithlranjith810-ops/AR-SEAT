@@ -7,6 +7,7 @@
  *   GET  /auth/me                                   -> 200 { user } (authenticated)
  *   POST /exam-seating/generations                  -> 202 { generationId, state, pollUrl } (ADMIN)
  *   GET  /exam-seating/exams                        -> 200 { exams } (ADMIN)
+ *   GET  /exam-seating/audit-logs                    -> 200 { items, total, limit, offset } (ADMIN)
  *   GET  /exam-seating/generations/:id              -> generation state + domain states
  *   GET  /exam-seating/generations/:id/seating      -> published seating grouped by hall
  *   GET  /exam-seating/plans/:seatingPlanId         -> seating plan by id (any status)
@@ -24,6 +25,7 @@
  * polling surface; the authoritative record is the SolveJob + SeatingPlan row.
  */
 import { createServer, type Server } from "node:http";
+import { AuditAction, Prisma } from "@prisma/client";
 import type {
   GenerationResult,
   GenerateOptions,
@@ -32,6 +34,7 @@ import { runSeatingGeneration } from "./integration";
 import { getSeatingPlanById, getSeatingPlanForExam } from "./persist";
 import { prisma } from "../db";
 import { SeatingError } from "../errors";
+import { logAudit } from "../services/audit.service";
 import { getExam, listExams } from "../services/exam.service";
 import { approvePlan, publishPlan } from "../services/seatingPlan.service";
 import { getDocument } from "../services/exam-document/document.service";
@@ -40,6 +43,38 @@ import {
   getCandidate,
   transitionValidationStatus,
 } from "../services/candidate.service";
+import {
+  createDepartment,
+  listDepartments,
+  updateDepartment,
+} from "../services/department.service";
+import {
+  createClass,
+  listClasses,
+  updateClass,
+} from "../services/class.service";
+import {
+  changeStudentStatus,
+  createStudent,
+  getStudent,
+  listStudents,
+  updateStudent,
+} from "../services/student.service";
+import {
+  createHall,
+  getHall,
+  listHalls,
+  updateHall,
+} from "../services/hall.service";
+import {
+  assignSeatToBench,
+  createBench,
+  getBenchDetail,
+  listBenches,
+  removeSeatFromBench,
+  setBenchActive,
+  updateBench,
+} from "../services/bench.service";
 import {
   AuthError,
   requireAdmin,
@@ -60,6 +95,8 @@ export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 const PDF_MAGIC = Buffer.from("%PDF-");
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 200;
+const AUDIT_DEFAULT_PAGE_SIZE = 20;
+const AUDIT_MAX_PAGE_SIZE = 100;
 
 class HttpError extends Error {
   constructor(
@@ -131,6 +168,12 @@ async function handleRequest(
     if (method === "GET" && path === "/exam-seating/exams") {
       requireAdmin(user);
       await handleListExams(res);
+      return;
+    }
+
+    if (method === "GET" && path === "/exam-seating/audit-logs") {
+      requireAdmin(user);
+      await handleListAuditLogs(req, res);
       return;
     }
 
@@ -217,6 +260,128 @@ async function handleRequest(
       return;
     }
 
+    if (method === "GET" && path === "/exam-seating/departments") {
+      requireAuth(user);
+      await handleListDepartments(res);
+      return;
+    }
+    if (method === "POST" && path === "/exam-seating/departments") {
+      const actor = requireAdmin(user);
+      await handleCreateDepartment(req, res, actor.id);
+      return;
+    }
+    const departmentMatch = path.match(/^\/exam-seating\/departments\/([^/]+)$/);
+    if (method === "PATCH" && departmentMatch) {
+      const actor = requireAdmin(user);
+      await handleUpdateDepartment(req, res, departmentMatch[1]!, actor.id);
+      return;
+    }
+
+    if (method === "GET" && path === "/exam-seating/classes") {
+      requireAuth(user);
+      await handleListClasses(req, res);
+      return;
+    }
+    if (method === "POST" && path === "/exam-seating/classes") {
+      const actor = requireAdmin(user);
+      await handleCreateClass(req, res, actor.id);
+      return;
+    }
+    const classMatch = path.match(/^\/exam-seating\/classes\/([^/]+)$/);
+    if (method === "PATCH" && classMatch) {
+      const actor = requireAdmin(user);
+      await handleUpdateClass(req, res, classMatch[1]!, actor.id);
+      return;
+    }
+
+    const studentStatusMatch = path.match(/^\/exam-seating\/students\/([^/]+)\/status$/);
+    if (method === "PATCH" && studentStatusMatch) {
+      const actor = requireAuth(user);
+      await handleChangeStudentStatus(req, res, studentStatusMatch[1]!, actor.id);
+      return;
+    }
+    if (method === "GET" && path === "/exam-seating/students") {
+      requireAuth(user);
+      await handleListStudents(req, res);
+      return;
+    }
+    if (method === "POST" && path === "/exam-seating/students") {
+      const actor = requireAuth(user);
+      await handleCreateStudent(req, res, actor.id);
+      return;
+    }
+    const studentMatch = path.match(/^\/exam-seating\/students\/([^/]+)$/);
+    if (method === "GET" && studentMatch) {
+      requireAuth(user);
+      await handleGetStudent(res, studentMatch[1]!);
+      return;
+    }
+    if (method === "PATCH" && studentMatch) {
+      const actor = requireAuth(user);
+      await handleUpdateStudent(req, res, studentMatch[1]!, actor.id);
+      return;
+    }
+
+    if (method === "GET" && path === "/exam-seating/halls") {
+      requireAuth(user);
+      await handleListHalls(res);
+      return;
+    }
+    if (method === "POST" && path === "/exam-seating/halls") {
+      const actor = requireAdmin(user);
+      await handleCreateHall(req, res, actor.id);
+      return;
+    }
+    const hallMatch = path.match(/^\/exam-seating\/halls\/([^/]+)$/);
+    if (method === "PATCH" && hallMatch) {
+      const actor = requireAdmin(user);
+      await handleUpdateHall(req, res, hallMatch[1]!, actor.id);
+      return;
+    }
+
+    const hallBenchesMatch = path.match(/^\/exam-seating\/halls\/([^/]+)\/benches$/);
+    if (method === "GET" && hallBenchesMatch) {
+      requireAuth(user);
+      await handleListBenches(res, hallBenchesMatch[1]!);
+      return;
+    }
+    if (method === "POST" && hallBenchesMatch) {
+      const actor = requireAdmin(user);
+      await handleCreateBench(req, res, hallBenchesMatch[1]!, actor.id);
+      return;
+    }
+
+    const benchMatch = path.match(/^\/exam-seating\/benches\/([^/]+)$/);
+    if (method === "GET" && benchMatch) {
+      requireAuth(user);
+      await handleGetBench(res, benchMatch[1]!);
+      return;
+    }
+    if (method === "PATCH" && benchMatch) {
+      const actor = requireAdmin(user);
+      await handleUpdateBench(req, res, benchMatch[1]!, actor.id);
+      return;
+    }
+
+    const benchStatusMatch = path.match(/^\/exam-seating\/benches\/([^/]+)\/status$/);
+    if (method === "POST" && benchStatusMatch) {
+      const actor = requireAdmin(user);
+      await handleSetBenchActive(req, res, benchStatusMatch[1]!, actor.id);
+      return;
+    }
+
+    const benchSeatMatch = path.match(/^\/exam-seating\/benches\/([^/]+)\/seats\/([^/]+)$/);
+    if (method === "POST" && benchSeatMatch) {
+      const actor = requireAdmin(user);
+      await handleAssignSeatToBench(res, benchSeatMatch[1]!, benchSeatMatch[2]!, actor.id);
+      return;
+    }
+    if (method === "DELETE" && benchSeatMatch) {
+      const actor = requireAdmin(user);
+      await handleRemoveSeatFromBench(res, benchSeatMatch[1]!, benchSeatMatch[2]!, actor.id);
+      return;
+    }
+
     json(res, 404, { error: "NOT_FOUND", message: `no route for ${method} ${path}` });
   } catch (error) {
     if (error instanceof AuthError) {
@@ -257,6 +422,37 @@ async function handleRequest(
     }
     if (error instanceof SeatingError && error.code === "INVALID_PLAN_STATUS_TRANSITION") {
       json(res, 409, { error: error.code, message: error.message });
+      return;
+    }
+    if (
+      error instanceof SeatingError &&
+      (error.code === "STUDENT_NOT_FOUND" ||
+        error.code === "DEPARTMENT_NOT_FOUND" ||
+        error.code === "CLASS_NOT_FOUND" ||
+        error.code === "HALL_NOT_FOUND" ||
+        error.code === "BENCH_NOT_FOUND")
+    ) {
+      json(res, 404, { error: error.code, message: error.message });
+      return;
+    }
+    if (
+      error instanceof SeatingError &&
+      (error.code === "BENCH_SEAT_HALL_MISMATCH" || error.code === "BENCH_SEAT_NOT_ASSIGNED")
+    ) {
+      json(res, 400, { error: error.code, message: error.message });
+      return;
+    }
+    if (
+      error instanceof SeatingError &&
+      (error.code === "STUDENT_ALREADY_EXISTS" ||
+        error.code === "DEPARTMENT_ALREADY_EXISTS" ||
+        error.code === "CLASS_ALREADY_EXISTS")
+    ) {
+      json(res, 409, { error: error.code, message: error.message });
+      return;
+    }
+    if (error instanceof SeatingError && error.code === "INVALID_INPUT") {
+      json(res, 400, { error: error.code, message: error.message });
       return;
     }
     console.error("[api] unexpected error", error);
@@ -490,6 +686,123 @@ function serializeExam(exam: {
   };
 }
 
+async function handleListAuditLogs(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+) {
+  const url = new URL(req.url ?? "/", "http://localhost");
+  const parsedLimit = Number(url.searchParams.get("limit") ?? AUDIT_DEFAULT_PAGE_SIZE);
+  const parsedOffset = Number(url.searchParams.get("offset") ?? 0);
+  if (
+    !Number.isInteger(parsedLimit) ||
+    parsedLimit < 1 ||
+    parsedLimit > AUDIT_MAX_PAGE_SIZE ||
+    !Number.isInteger(parsedOffset) ||
+    parsedOffset < 0
+  ) {
+    json(res, 400, {
+      error: "INVALID_PAGINATION",
+      message: `limit must be 1..${AUDIT_MAX_PAGE_SIZE} and offset must be >= 0`,
+    });
+    return;
+  }
+
+  const where: Prisma.AuditLogWhereInput = {};
+
+  const actionRaw = url.searchParams.get("action");
+  if (actionRaw !== null && actionRaw.length > 0) {
+    if (!Object.values(AuditAction).includes(actionRaw as AuditAction)) {
+      json(res, 400, { error: "INVALID_ACTION", message: "action must be a valid audit action" });
+      return;
+    }
+    where.action = actionRaw as AuditAction;
+  }
+
+  const entityType = url.searchParams.get("entityType");
+  if (entityType !== null && entityType.length > 0) where.entityType = entityType;
+
+  const entityId = url.searchParams.get("entityId");
+  if (entityId !== null && entityId.length > 0) where.entityId = entityId;
+
+  const actorId = url.searchParams.get("actorId");
+  if (actorId !== null && actorId.length > 0) where.actorId = actorId;
+
+  const from = parseIsoDate(url.searchParams.get("from"));
+  const to = parseIsoDate(url.searchParams.get("to"));
+  if (from === null || to === null) {
+    json(res, 400, { error: "INVALID_DATE", message: "from and to must be valid ISO timestamps" });
+    return;
+  }
+  if (from !== undefined && to !== undefined && from.getTime() > to.getTime()) {
+    json(res, 400, { error: "INVALID_DATE_RANGE", message: "from must not be after to" });
+    return;
+  }
+  if (from !== undefined || to !== undefined) {
+    where.createdAt = {
+      ...(from !== undefined ? { gte: from } : {}),
+      ...(to !== undefined ? { lte: to } : {}),
+    };
+  }
+
+  const [total, logs] = await Promise.all([
+    prisma.auditLog.count({ where }),
+    prisma.auditLog.findMany({
+      where,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: parsedOffset,
+      take: parsedLimit,
+    }),
+  ]);
+
+  // Resolve the page's actors in a single bounded query (no N+1).
+  const actorIds = [
+    ...new Set(logs.map((log) => log.actorId).filter((id): id is string => Boolean(id))),
+  ];
+  const usersById = new Map<string, { id: string; username: string; role: string }>();
+  if (actorIds.length > 0) {
+    const users = await prisma.user.findMany({
+      where: { id: { in: actorIds } },
+      select: { id: true, username: true, role: true },
+    });
+    for (const user of users) usersById.set(user.id, user);
+  }
+
+  json(res, 200, {
+    items: logs.map((log) => serializeAuditLog(log, usersById)),
+    total,
+    limit: parsedLimit,
+    offset: parsedOffset,
+  });
+}
+
+function parseIsoDate(value: string | null): Date | undefined | null {
+  if (value === null || value.length === 0) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function serializeAuditLog(
+  log: {
+    id: string;
+    actorId: string | null;
+    action: string;
+    entityType: string;
+    entityId: string;
+    createdAt: Date;
+  },
+  usersById: Map<string, { id: string; username: string; role: string }>,
+) {
+  const user = log.actorId ? usersById.get(log.actorId) : undefined;
+  return {
+    id: log.id,
+    action: log.action,
+    entityType: log.entityType,
+    entityId: log.entityId,
+    createdAt: log.createdAt,
+    actor: user ? { id: user.id, username: user.username, role: user.role } : null,
+  };
+}
+
 async function handleGetDocumentCandidates(
   req: import("node:http").IncomingMessage,
   res: import("node:http").ServerResponse,
@@ -603,6 +916,494 @@ function serializeDocument(document: {
     createdAt: document.createdAt,
     updatedAt: document.updatedAt,
   };
+}
+
+async function handleListDepartments(res: import("node:http").ServerResponse) {
+  const departments = await listDepartments();
+  json(res, 200, { departments });
+}
+
+async function handleCreateDepartment(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  actorId: string,
+) {
+  const body = await readJsonBody(req, res);
+  if (!body) return;
+  const department = await createDepartment(
+    { code: String(body.code ?? ""), name: String(body.name ?? "") },
+    actorId,
+  );
+  json(res, 200, { department });
+}
+
+async function handleUpdateDepartment(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  id: string,
+  actorId: string,
+) {
+  const body = await readJsonBody(req, res);
+  if (!body) return;
+  const patch: { code?: string; name?: string } = {};
+  if (body.code !== undefined) patch.code = String(body.code);
+  if (body.name !== undefined) patch.name = String(body.name);
+  if (Object.keys(patch).length === 0) {
+    json(res, 400, { error: "INVALID_INPUT", message: "at least one field must be provided" });
+    return;
+  }
+  const department = await updateDepartment(id, patch, actorId);
+  json(res, 200, { department });
+}
+
+async function handleListClasses(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+) {
+  const url = new URL(req.url ?? "/", "http://localhost");
+  const departmentId = url.searchParams.get("departmentId") ?? undefined;
+  const classes = await listClasses({ departmentId });
+  json(res, 200, { classes });
+}
+
+async function handleCreateClass(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  actorId: string,
+) {
+  const body = await readJsonBody(req, res);
+  if (!body) return;
+  const cls = await createClass(
+    {
+      departmentId: String(body.departmentId ?? ""),
+      name: String(body.name ?? ""),
+      year: Number(body.year),
+      section: String(body.section ?? ""),
+      academicYear: String(body.academicYear ?? ""),
+    },
+    actorId,
+  );
+  json(res, 200, { class: cls });
+}
+
+async function handleUpdateClass(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  id: string,
+  actorId: string,
+) {
+  const body = await readJsonBody(req, res);
+  if (!body) return;
+  const patch: {
+    departmentId?: string;
+    name?: string;
+    year?: number;
+    section?: string;
+    academicYear?: string;
+  } = {};
+  if (body.departmentId !== undefined) patch.departmentId = String(body.departmentId);
+  if (body.name !== undefined) patch.name = String(body.name);
+  if (body.year !== undefined) patch.year = Number(body.year);
+  if (body.section !== undefined) patch.section = String(body.section);
+  if (body.academicYear !== undefined) patch.academicYear = String(body.academicYear);
+  if (Object.keys(patch).length === 0) {
+    json(res, 400, { error: "INVALID_INPUT", message: "at least one field must be provided" });
+    return;
+  }
+  const cls = await updateClass(id, patch, actorId);
+  json(res, 200, { class: cls });
+}
+
+async function handleListStudents(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+) {
+  const url = new URL(req.url ?? "/", "http://localhost");
+  const parsedLimit = Number(url.searchParams.get("limit") ?? DEFAULT_PAGE_SIZE);
+  const parsedOffset = Number(url.searchParams.get("offset") ?? 0);
+  if (
+    !Number.isInteger(parsedLimit) ||
+    parsedLimit < 1 ||
+    parsedLimit > MAX_PAGE_SIZE ||
+    !Number.isInteger(parsedOffset) ||
+    parsedOffset < 0
+  ) {
+    json(res, 400, { error: "INVALID_PAGINATION", message: "limit must be 1..200 and offset must be >= 0" });
+    return;
+  }
+  const search = url.searchParams.get("search") ?? undefined;
+  const departmentId = url.searchParams.get("departmentId") ?? undefined;
+  const classId = url.searchParams.get("classId") ?? undefined;
+  const statusRaw = url.searchParams.get("status");
+  const page = await listStudents({
+    search,
+    departmentId,
+    classId,
+    status: statusRaw !== null && statusRaw.length > 0 ? (statusRaw as never) : undefined,
+    limit: parsedLimit,
+    offset: parsedOffset,
+  });
+  json(res, 200, {
+    students: page.students,
+    total: page.total,
+    limit: parsedLimit,
+    offset: parsedOffset,
+  });
+}
+
+async function handleGetStudent(
+  res: import("node:http").ServerResponse,
+  id: string,
+) {
+  const student = await getStudent(id);
+  json(res, 200, { student });
+}
+
+async function handleCreateStudent(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  actorId: string,
+) {
+  const body = await readJsonBody(req, res);
+  if (!body) return;
+  const student = await createStudent(
+    {
+      name: String(body.name ?? ""),
+      rollNumber: String(body.rollNumber ?? ""),
+      registerNumber: String(body.registerNumber ?? ""),
+      gender: body.gender as never,
+      classId: String(body.classId ?? ""),
+      status: (body.status ?? "ACTIVE") as never,
+    },
+    actorId,
+  );
+  json(res, 200, { student });
+}
+
+async function handleUpdateStudent(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  id: string,
+  actorId: string,
+) {
+  const body = await readJsonBody(req, res);
+  if (!body) return;
+  const patch: {
+    name?: string;
+    rollNumber?: string;
+    registerNumber?: string;
+    gender?: never;
+    classId?: string;
+  } = {};
+  if (body.name !== undefined) patch.name = String(body.name);
+  if (body.rollNumber !== undefined) patch.rollNumber = String(body.rollNumber);
+  if (body.registerNumber !== undefined) patch.registerNumber = String(body.registerNumber);
+  if (body.gender !== undefined) patch.gender = body.gender as never;
+  if (body.classId !== undefined) patch.classId = String(body.classId);
+  if (Object.keys(patch).length === 0) {
+    json(res, 400, { error: "INVALID_INPUT", message: "at least one field must be provided" });
+    return;
+  }
+  const student = await updateStudent(id, patch, actorId);
+  json(res, 200, { student });
+}
+
+async function handleChangeStudentStatus(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  id: string,
+  actorId: string,
+) {
+  const body = await readJsonBody(req, res);
+  if (!body) return;
+  const student = await changeStudentStatus(id, body.status as never, actorId);
+  json(res, 200, { student });
+}
+
+async function handleListHalls(res: import("node:http").ServerResponse) {
+  const halls = await listHalls();
+  json(res, 200, { halls: halls.map(serializeHall) });
+}
+
+async function handleCreateHall(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  actorId: string,
+) {
+  const body = await readJsonBody(req, res);
+  if (!body) return;
+  const hall = await createHall({
+    hallNumber: String(body.hallNumber ?? ""),
+    name: String(body.name ?? ""),
+    building: body.building === undefined ? null : String(body.building),
+    rows: Number(body.rows),
+    columns: Number(body.columns),
+  });
+  await logAudit({
+    actorId,
+    action: "HALL_CREATED",
+    entityType: "Hall",
+    entityId: hall.id,
+    metadata: {
+      hallNumber: hall.hallNumber,
+      rows: hall.rows,
+      columns: hall.columns,
+    },
+  });
+  json(res, 200, { hall: serializeHall(await listHallsHall(hall.id)) });
+}
+
+async function handleUpdateHall(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  id: string,
+  actorId: string,
+) {
+  const body = await readJsonBody(req, res);
+  if (!body) return;
+  const patch: { name?: string; building?: string | null; isActive?: boolean } = {};
+  if (body.name !== undefined) patch.name = String(body.name);
+  if (body.building !== undefined) patch.building = body.building === null ? null : String(body.building);
+  if (body.isActive !== undefined) patch.isActive = Boolean(body.isActive);
+  if (Object.keys(patch).length === 0) {
+    json(res, 400, { error: "INVALID_INPUT", message: "at least one field must be provided" });
+    return;
+  }
+  const before = await getHall(id);
+  const hall = await updateHall(id, patch);
+  await logAudit({
+    actorId,
+    action: "HALL_UPDATED",
+    entityType: "Hall",
+    entityId: id,
+    metadata: {
+      previous: { name: before.name, building: before.building, isActive: before.isActive },
+      next: { name: hall.name, building: hall.building, isActive: hall.isActive },
+    },
+  });
+  json(res, 200, { hall: serializeHall(await listHallsHall(id)) });
+}
+
+async function handleListBenches(
+  res: import("node:http").ServerResponse,
+  hallId: string,
+) {
+  const benches = await listBenches(hallId);
+  json(res, 200, { hallId, benches: benches.map(serializeBench) });
+}
+
+async function handleCreateBench(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  hallId: string,
+  actorId: string,
+) {
+  const body = await readJsonBody(req, res);
+  if (!body) return;
+  const bench = await createBench(
+    {
+      hallId,
+      benchNumber: String(body.benchNumber ?? ""),
+      isActive: body.isActive === undefined ? true : Boolean(body.isActive),
+    },
+    actorId,
+  );
+  json(res, 200, { bench: serializeBench(await getBenchDetail(bench.id)) });
+}
+
+async function handleGetBench(res: import("node:http").ServerResponse, id: string) {
+  json(res, 200, { bench: serializeBench(await getBenchDetail(id)) });
+}
+
+async function handleUpdateBench(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  id: string,
+  actorId: string,
+) {
+  const body = await readJsonBody(req, res);
+  if (!body) return;
+  const patch: { benchNumber?: string; isActive?: boolean } = {};
+  if (body.benchNumber !== undefined) patch.benchNumber = String(body.benchNumber);
+  if (body.isActive !== undefined) patch.isActive = Boolean(body.isActive);
+  const bench = await updateBench(id, patch, actorId);
+  json(res, 200, { bench: serializeBench(await getBenchDetail(bench.id)) });
+}
+
+async function handleSetBenchActive(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  id: string,
+  actorId: string,
+) {
+  const body = await readJsonBody(req, res);
+  if (!body) return;
+  if (body.isActive === undefined || typeof body.isActive !== "boolean") {
+    json(res, 400, { error: "INVALID_INPUT", message: "isActive must be a boolean" });
+    return;
+  }
+  const bench = await setBenchActive(id, body.isActive, actorId);
+  json(res, 200, { bench: serializeBench(await getBenchDetail(bench.id)) });
+}
+
+async function handleAssignSeatToBench(
+  res: import("node:http").ServerResponse,
+  benchId: string,
+  hallSeatId: string,
+  actorId: string,
+) {
+  const seat = await assignSeatToBench(benchId, hallSeatId, actorId);
+  json(res, 200, { hallSeat: serializeHallSeat(seat) });
+}
+
+async function handleRemoveSeatFromBench(
+  res: import("node:http").ServerResponse,
+  benchId: string,
+  hallSeatId: string,
+  actorId: string,
+) {
+  const seat = await removeSeatFromBench(benchId, hallSeatId, actorId);
+  json(res, 200, { hallSeat: serializeHallSeat(seat) });
+}
+
+async function listHallsHall(id: string) {
+  const halls = await listHalls();
+  const hall = halls.find((h) => h.id === id);
+  if (!hall) throw new SeatingError("Hall not found", "HALL_NOT_FOUND");
+  return hall;
+}
+
+function serializeHall(hall: {
+  id: string;
+  hallNumber: string;
+  name: string;
+  building: string | null;
+  rows: number;
+  columns: number;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  seats: Array<{
+    id: string;
+    benchId: string | null;
+    seatPosition: string;
+    row: string;
+    column: number;
+    isActive: boolean;
+  }>;
+  benches: Array<{
+    id: string;
+    hallId: string;
+    benchNumber: string;
+    isActive: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+    seats: Array<{
+      id: string;
+      benchId: string | null;
+      seatPosition: string;
+      row: string;
+      column: number;
+      isActive: boolean;
+    }>;
+  }>;
+}) {
+  const seats = hall.seats;
+  return {
+    id: hall.id,
+    hallNumber: hall.hallNumber,
+    name: hall.name,
+    building: hall.building,
+    rows: hall.rows,
+    columns: hall.columns,
+    isActive: hall.isActive,
+    createdAt: hall.createdAt,
+    updatedAt: hall.updatedAt,
+    totalSeatCount: seats.length,
+    activeSeatCount: seats.filter((s) => s.isActive).length,
+    unassignedSeats: seats
+      .filter((s) => s.benchId === null)
+      .map((s) => ({ ...s })),
+    benches: hall.benches.map((b) => ({
+      id: b.id,
+      hallId: b.hallId,
+      benchNumber: b.benchNumber,
+      isActive: b.isActive,
+      createdAt: b.createdAt,
+      updatedAt: b.updatedAt,
+      capacity: b.seats.filter((s) => s.isActive).length,
+      seats: b.seats.map((s) => ({ ...s })),
+    })),
+  };
+}
+
+function serializeBench(bench: {
+  id: string;
+  hallId: string;
+  benchNumber: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  hall?: { id: string; hallNumber: string; name: string; building: string | null };
+  seats?: Array<{
+    id: string;
+    seatPosition: string;
+    row: string;
+    column: number;
+    isActive: boolean;
+  }>;
+}) {
+  const seats = bench.seats ?? [];
+  return {
+    id: bench.id,
+    hallId: bench.hallId,
+    benchNumber: bench.benchNumber,
+    isActive: bench.isActive,
+    createdAt: bench.createdAt,
+    updatedAt: bench.updatedAt,
+    hall: bench.hall ?? null,
+    capacity: seats.filter((s) => s.isActive).length,
+    seats,
+  };
+}
+
+function serializeHallSeat(seat: {
+  id: string;
+  hallId: string;
+  benchId: string | null;
+  seatPosition: string;
+  row: string;
+  column: number;
+  isActive: boolean;
+}) {
+  return {
+    id: seat.id,
+    hallId: seat.hallId,
+    benchId: seat.benchId,
+    seatPosition: seat.seatPosition,
+    row: seat.row,
+    column: seat.column,
+    isActive: seat.isActive,
+  };
+}
+
+async function readJsonBody(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+): Promise<Record<string, unknown> | null> {
+  const body = await readBody(req);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    json(res, 400, { error: "INVALID_JSON", message: "request body must be JSON" });
+    return null;
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    json(res, 400, { error: "INVALID_JSON", message: "request body must be a JSON object" });
+    return null;
+  }
+  return parsed as Record<string, unknown>;
 }
 
 function readBinaryBody(

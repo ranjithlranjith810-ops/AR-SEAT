@@ -108,14 +108,31 @@ export async function seedDatabase(prisma: PrismaClient): Promise<void> {
   });
 
   const rowLetters = ["A", "B", "C", "D", "E"];
+  const benchIds = new Map<string, string>();
+  for (const letter of rowLetters) {
+    const bench = await prisma.bench.upsert({
+      where: { hallId_benchNumber: { hallId: hall.id, benchNumber: letter } },
+      update: { isActive: true },
+      create: { hallId: hall.id, benchNumber: letter, isActive: true },
+    });
+    benchIds.set(letter, bench.id);
+  }
+
   for (const [rowIndex, letter] of rowLetters.entries()) {
     void rowIndex;
     for (let column = 1; column <= hall.columns; column++) {
       const seatPosition = `${letter}${column}`;
       await prisma.hallSeat.upsert({
         where: { hallId_seatPosition: { hallId: hall.id, seatPosition } },
-        update: { row: letter, column, isActive: true },
-        create: { hallId: hall.id, seatPosition, row: letter, column, isActive: true },
+        update: { row: letter, column, isActive: true, benchId: benchIds.get(letter) ?? null },
+        create: {
+          hallId: hall.id,
+          seatPosition,
+          row: letter,
+          column,
+          isActive: true,
+          benchId: benchIds.get(letter) ?? null,
+        },
       });
     }
   }

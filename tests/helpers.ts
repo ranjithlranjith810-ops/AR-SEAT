@@ -14,6 +14,7 @@ const TABLES = [
   '"classes"',
   '"departments"',
   '"hall_seats"',
+  '"benches"',
   '"halls"',
 ] as const;
 

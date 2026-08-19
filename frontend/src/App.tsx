@@ -1,14 +1,17 @@
 import { HashRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./auth/AuthContext";
 import { RequireAdmin, RequireAuth } from "./auth/guards";
+import { AuditPage } from "./components/AuditPage";
 import { CandidatePage } from "./components/CandidatePage";
 import { DocumentStatusPage } from "./components/DocumentStatusPage";
 import { ExamSelectionPage } from "./components/ExamSelectionPage";
 import { GenerationStatusPage } from "./components/GenerationStatusPage";
+import { HallsPage } from "./components/HallsPage";
 import { HomePage } from "./components/HomePage";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./components/LoginPage";
 import { SeatingPage } from "./components/SeatingPage";
+import { StudentsPage } from "./components/StudentsPage";
 import { UploadPage } from "./components/UploadPage";
 
 function NotFound() {
@@ -34,6 +37,15 @@ export default function App() {
             }
           >
             <Route path="/" element={<HomePage />} />
+            <Route path="/students" element={<StudentsPage />} />
+            <Route
+              path="/halls"
+              element={
+                <RequireAdmin>
+                  <HallsPage />
+                </RequireAdmin>
+              }
+            />
             <Route
               path="/exams"
               element={
@@ -47,6 +59,14 @@ export default function App() {
               element={
                 <RequireAdmin>
                   <UploadPage />
+                </RequireAdmin>
+              }
+            />
+            <Route
+              path="/audit"
+              element={
+                <RequireAdmin>
+                  <AuditPage />
                 </RequireAdmin>
               }
             />

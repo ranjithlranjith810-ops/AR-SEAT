@@ -1,9 +1,95 @@
 export type Role = "ADMIN" | "STAFF";
 
+export type Gender = "MALE" | "FEMALE" | "OTHER";
+
+export type StudentStatus = "ACTIVE" | "INACTIVE" | "PASSED_OUT" | "TRANSFERRED";
+
+export const STUDENT_STATUSES: StudentStatus[] = [
+  "ACTIVE",
+  "INACTIVE",
+  "PASSED_OUT",
+  "TRANSFERRED",
+];
+
+export interface Department {
+  id: string;
+  code: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ClassItem {
+  id: string;
+  departmentId: string;
+  name: string;
+  year: number;
+  section: string;
+  academicYear: string;
+  department: { id: string; code: string; name: string };
+}
+
+export interface Student {
+  id: string;
+  name: string;
+  rollNumber: string;
+  registerNumber: string;
+  gender: Gender;
+  status: StudentStatus;
+  classId: string;
+  createdAt: string;
+  updatedAt: string;
+  class: ClassItem;
+}
+
+export interface StudentPage {
+  students: Student[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface PublicUser {
   id: string;
   username: string;
   role: Role;
+}
+
+export interface HallSeat {
+  id: string;
+  hallId: string;
+  benchId: string | null;
+  seatPosition: string;
+  row: string;
+  column: number;
+  isActive: boolean;
+}
+
+export interface HallBench {
+  id: string;
+  hallId: string;
+  benchNumber: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  capacity: number;
+  seats: HallSeat[];
+}
+
+export interface Hall {
+  id: string;
+  hallNumber: string;
+  name: string;
+  building: string | null;
+  rows: number;
+  columns: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  totalSeatCount: number;
+  activeSeatCount: number;
+  unassignedSeats: HallSeat[];
+  benches: HallBench[];
 }
 
 export type ExamSession = "FN" | "AN";
@@ -173,6 +259,59 @@ export interface SeatingPlan {
   createdAt: string;
   updatedAt: string;
   assignments: SeatingAssignment[];
+}
+
+export const AUDIT_ACTIONS = [
+  "PDF_UPLOADED",
+  "CANDIDATE_MATCHED",
+  "CANDIDATE_RESOLVED",
+  "EXAM_CREATED",
+  "SOLVE_REQUESTED",
+  "SOLVE_STARTED",
+  "SOLVE_COMPLETED",
+  "SOLVE_FAILED",
+  "PLAN_APPROVED",
+  "PLAN_PUBLISHED",
+  "PLAN_SUPERSEDED",
+  "STUDENT_CREATED",
+  "STUDENT_UPDATED",
+  "STUDENT_STATUS_CHANGED",
+  "DEPARTMENT_CREATED",
+  "DEPARTMENT_UPDATED",
+  "CLASS_CREATED",
+  "CLASS_UPDATED",
+  "HALL_CREATED",
+  "HALL_UPDATED",
+  "HALL_STATUS_CHANGED",
+  "BENCH_CREATED",
+  "BENCH_UPDATED",
+  "BENCH_STATUS_CHANGED",
+  "BENCH_SEAT_ASSIGNED",
+  "BENCH_SEAT_REMOVED",
+] as const;
+
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+
+export interface AuditActor {
+  id: string;
+  username: string;
+  role: Role;
+}
+
+export interface AuditLogItem {
+  id: string;
+  action: AuditAction;
+  entityType: string;
+  entityId: string;
+  createdAt: string;
+  actor: AuditActor | null;
+}
+
+export interface AuditLogPage {
+  items: AuditLogItem[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 export function isTerminalGenerationState(state: GenerationState): boolean {

@@ -24,6 +24,14 @@ export function Layout() {
                 Home
               </NavLink>
             </li>
+            <li>
+              <NavLink to="/students">Students</NavLink>
+            </li>
+            {user?.role === "ADMIN" && (
+              <li>
+                <NavLink to="/halls">Halls &amp; benches</NavLink>
+              </li>
+            )}
             {user?.role === "ADMIN" && (
               <li>
                 <NavLink to="/exams">Exams</NavLink>
@@ -32,6 +40,11 @@ export function Layout() {
             {user?.role === "ADMIN" && (
               <li>
                 <NavLink to="/upload">Upload documents</NavLink>
+              </li>
+            )}
+            {user?.role === "ADMIN" && (
+              <li>
+                <NavLink to="/audit">Audit log</NavLink>
               </li>
             )}
           </ul>
