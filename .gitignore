@@ -10,3 +10,4 @@ coverage
 # Phase 3 benchmark evidence logs (same convention).
 !docs/evidence/phase3-benchmarks/*.log
 prisma/migrations/dev.db
+test-results
