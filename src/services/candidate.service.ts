@@ -1,6 +1,7 @@
 import { CandidateValidationStatus } from "@prisma/client";
 import { prisma } from "../db";
 import { SeatingError } from "../errors";
+import { assertExamCandidatesMutable } from "./exam.service";
 import { logAudit } from "./audit.service";
 
 export interface CreateCandidateInput {
@@ -27,7 +28,7 @@ const VALIDATION_TRANSITIONS: Record<
   UNVERIFIED: ["MATCHED", "REJECTED"],
   MATCHED: ["VALIDATED", "REJECTED"],
   VALIDATED: ["REJECTED"],
-  REJECTED: [],
+  REJECTED: ["MATCHED"],
 };
 
 export function assertValidationTransition(
@@ -97,6 +98,105 @@ export async function transitionValidationStatus(
     entityId: id,
     actorId,
     metadata: { validationStatus: to },
+  });
+  return updated;
+}
+
+export interface AddCandidateFromMasterInput {
+  examId: string;
+  studentId: string;
+  subjectCode?: string;
+  subjectName?: string;
+  reason?: string;
+}
+
+export async function addCandidateFromMaster(
+  input: AddCandidateFromMasterInput,
+  actorId?: string,
+) {
+  await assertExamCandidatesMutable(input.examId);
+
+  const student = await prisma.student.findUnique({
+    where: { id: input.studentId },
+    include: { class: { include: { department: true } } },
+  });
+  if (!student) throw new SeatingError("Student not found", "STUDENT_NOT_FOUND");
+
+  const existing = await prisma.examCandidate.findUnique({
+    where: { examId_studentId: { examId: input.examId, studentId: input.studentId } },
+  });
+  if (existing) {
+    throw new SeatingError(
+      "Student is already a candidate of this exam",
+      "STUDENT_ALREADY_CANDIDATE",
+    );
+  }
+
+  const candidate = await prisma.examCandidate.create({
+    data: {
+      examId: input.examId,
+      studentId: input.studentId,
+      sourceDocumentId: null,
+      registerNumberSnapshot: student.registerNumber,
+      studentNameSnapshot: student.name,
+      departmentSnapshot: student.class.department.code,
+      genderSnapshot: student.gender,
+      classSnapshot: student.class.name,
+      subjectCode: input.subjectCode?.trim() || "MANUAL",
+      subjectName: input.subjectName?.trim() || "Manual addition",
+      validationStatus: "MATCHED",
+    },
+  });
+  await logAudit({
+    action: "EXAM_CANDIDATE_ADDED",
+    entityType: "ExamCandidate",
+    entityId: candidate.id,
+    actorId,
+    metadata: {
+      examId: input.examId,
+      studentId: input.studentId,
+      registerNumber: candidate.registerNumberSnapshot,
+      ...(input.reason ? { reason: input.reason } : {}),
+    },
+  });
+  return candidate;
+}
+
+export async function excludeCandidate(id: string, reason: string, actorId?: string) {
+  if (!reason || reason.trim().length === 0) {
+    throw new SeatingError("An audit reason is required to exclude a candidate", "INVALID_INPUT");
+  }
+  const candidate = await getCandidate(id);
+  await assertExamCandidatesMutable(candidate.examId);
+  assertValidationTransition(candidate.validationStatus, "REJECTED");
+  const updated = await prisma.examCandidate.update({
+    where: { id },
+    data: { validationStatus: "REJECTED" },
+  });
+  await logAudit({
+    action: "EXAM_CANDIDATE_EXCLUDED",
+    entityType: "ExamCandidate",
+    entityId: id,
+    actorId,
+    metadata: { reason, previousStatus: candidate.validationStatus },
+  });
+  return updated;
+}
+
+export async function reinstateCandidate(id: string, reason?: string, actorId?: string) {
+  const candidate = await getCandidate(id);
+  await assertExamCandidatesMutable(candidate.examId);
+  assertValidationTransition(candidate.validationStatus, "MATCHED");
+  const updated = await prisma.examCandidate.update({
+    where: { id },
+    data: { validationStatus: "MATCHED" },
+  });
+  await logAudit({
+    action: "EXAM_CANDIDATE_REINSTATED",
+    entityType: "ExamCandidate",
+    entityId: id,
+    actorId,
+    metadata: reason ? { reason } : undefined,
   });
   return updated;
 }

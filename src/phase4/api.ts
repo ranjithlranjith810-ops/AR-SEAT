@@ -16,6 +16,12 @@
  *   POST /exam-seating/documents?examId=            -> 200 IngestReport (ADMIN; application/pdf body)
  *   GET  /exam-seating/documents/:id                -> ingestion status (document record)
  *   GET  /exam-seating/documents/:id/candidates     -> validated candidate view (paginated)
+ *   GET  /exam-seating/exams/:id/conflicts          -> 200 conflict report (ADMIN)
+ *   GET  /exam-seating/exams/:id/candidates         -> 200 exam-wide candidate roster (ADMIN)
+ *   POST /exam-seating/exams/:id/candidates         -> 200 candidate added from master (ADMIN)
+ *   POST /exam-seating/exams/:id/candidates/:cid/exclude   -> 200 candidate excluded (ADMIN)
+ *   POST /exam-seating/exams/:id/candidates/:cid/reinstate -> 200 candidate reinstated (ADMIN)
+ *   POST /exam-seating/exams/:id/cancel             -> 200 exam cancelled (ADMIN)
  *
  * Authentication/session validation/role authorization run BEFORE routing, so
  * an unauthenticated request never reaches candidate processing, partitioning,
@@ -35,12 +41,16 @@ import { getSeatingPlanById, getSeatingPlanForExam } from "./persist";
 import { prisma } from "../db";
 import { SeatingError } from "../errors";
 import { logAudit } from "../services/audit.service";
-import { getExam, listExams } from "../services/exam.service";
+import { getExam, listExams, cancelExam } from "../services/exam.service";
 import { approvePlan, publishPlan } from "../services/seatingPlan.service";
 import { getDocument } from "../services/exam-document/document.service";
 import { ingestExamDocument } from "../services/exam-document/ingest";
+import { checkExamConflicts } from "../services/conflict.service";
 import {
+  addCandidateFromMaster,
+  excludeCandidate,
   getCandidate,
+  reinstateCandidate,
   transitionValidationStatus,
 } from "../services/candidate.service";
 import {
@@ -168,6 +178,62 @@ async function handleRequest(
     if (method === "GET" && path === "/exam-seating/exams") {
       requireAdmin(user);
       await handleListExams(res);
+      return;
+    }
+
+    const examConflictsMatch = path.match(/^\/exam-seating\/exams\/([^/]+)\/conflicts$/);
+    if (method === "GET" && examConflictsMatch) {
+      const actor = requireAdmin(user);
+      await handleGetExamConflicts(res, decodePathSegment(examConflictsMatch[1]!), actor.id);
+      return;
+    }
+
+    const examCandidatesMatch = path.match(/^\/exam-seating\/exams\/([^/]+)\/candidates$/);
+    if (method === "GET" && examCandidatesMatch) {
+      requireAdmin(user);
+      await handleGetExamCandidates(req, res, decodePathSegment(examCandidatesMatch[1]!));
+      return;
+    }
+    if (method === "POST" && examCandidatesMatch) {
+      const actor = requireAdmin(user);
+      await handleAddExamCandidate(req, res, decodePathSegment(examCandidatesMatch[1]!), actor.id);
+      return;
+    }
+
+    const examCandidateExcludeMatch = path.match(
+      /^\/exam-seating\/exams\/([^/]+)\/candidates\/([^/]+)\/exclude$/,
+    );
+    if (method === "POST" && examCandidateExcludeMatch) {
+      const actor = requireAdmin(user);
+      await handleExcludeCandidate(
+        req,
+        res,
+        decodePathSegment(examCandidateExcludeMatch[1]!),
+        decodePathSegment(examCandidateExcludeMatch[2]!),
+        actor.id,
+      );
+      return;
+    }
+
+    const examCandidateReinstateMatch = path.match(
+      /^\/exam-seating\/exams\/([^/]+)\/candidates\/([^/]+)\/reinstate$/,
+    );
+    if (method === "POST" && examCandidateReinstateMatch) {
+      const actor = requireAdmin(user);
+      await handleReinstateCandidate(
+        req,
+        res,
+        decodePathSegment(examCandidateReinstateMatch[1]!),
+        decodePathSegment(examCandidateReinstateMatch[2]!),
+        actor.id,
+      );
+      return;
+    }
+
+    const examCancelMatch = path.match(/^\/exam-seating\/exams\/([^/]+)\/cancel$/);
+    if (method === "POST" && examCancelMatch) {
+      const actor = requireAdmin(user);
+      await handleCancelExam(req, res, decodePathSegment(examCancelMatch[1]!), actor.id);
       return;
     }
 
@@ -451,6 +517,15 @@ async function handleRequest(
       json(res, 409, { error: error.code, message: error.message });
       return;
     }
+    if (
+      error instanceof SeatingError &&
+      (error.code === "EXAM_NOT_MUTABLE" ||
+        error.code === "STUDENT_ALREADY_CANDIDATE" ||
+        error.code === "EXAM_CANCELLATION_BLOCKED_ACTIVE_GENERATION")
+    ) {
+      json(res, 409, { error: error.code, message: error.message });
+      return;
+    }
     if (error instanceof SeatingError && error.code === "INVALID_INPUT") {
       json(res, 400, { error: error.code, message: error.message });
       return;
@@ -684,6 +759,170 @@ function serializeExam(exam: {
     createdAt: exam.createdAt,
     updatedAt: exam.updatedAt,
   };
+}
+
+async function handleGetExamConflicts(
+  res: import("node:http").ServerResponse,
+  examId: string,
+  actorId: string,
+) {
+  const report = await checkExamConflicts(examId);
+  await logAudit({
+    actorId,
+    action: "EXAM_CONFLICT_CHECKED",
+    entityType: "Exam",
+    entityId: examId,
+    metadata: { conflictCount: report.conflicts.length },
+  });
+  json(res, 200, serializeConflictReport(report));
+}
+
+function serializeConflictReport(report: {
+  examId: string;
+  examDate: Date;
+  session: string;
+  conflicts: Array<{
+    studentId: string;
+    registerNumber: string;
+    studentName: string;
+    candidate: {
+      candidateId: string;
+      examId: string;
+      status: string;
+      subjectCode: string;
+      subjectName: string;
+      validationStatus: string;
+    };
+    conflictingExams: Array<{
+      candidateId: string;
+      examId: string;
+      status: string;
+      subjectCode: string;
+      subjectName: string;
+      validationStatus: string;
+    }>;
+  }>;
+}) {
+  return {
+    examId: report.examId,
+    examDate: report.examDate,
+    session: report.session,
+    conflicts: report.conflicts,
+  };
+}
+
+async function handleGetExamCandidates(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  examId: string,
+) {
+  const url = new URL(req.url ?? "/", "http://localhost");
+  const parsedLimit = Number(url.searchParams.get("limit") ?? DEFAULT_PAGE_SIZE);
+  const parsedOffset = Number(url.searchParams.get("offset") ?? 0);
+  if (
+    !Number.isInteger(parsedLimit) ||
+    parsedLimit < 1 ||
+    parsedLimit > MAX_PAGE_SIZE ||
+    !Number.isInteger(parsedOffset) ||
+    parsedOffset < 0
+  ) {
+    json(res, 400, { error: "INVALID_PAGINATION", message: "limit must be 1..200 and offset must be >= 0" });
+    return;
+  }
+  const where = { examId };
+  const [total, candidates] = await Promise.all([
+    prisma.examCandidate.count({ where }),
+    prisma.examCandidate.findMany({
+      where,
+      orderBy: { registerNumberSnapshot: "asc" },
+      skip: parsedOffset,
+      take: parsedLimit,
+      select: {
+        id: true,
+        registerNumberSnapshot: true,
+        studentNameSnapshot: true,
+        departmentSnapshot: true,
+        genderSnapshot: true,
+        classSnapshot: true,
+        subjectCode: true,
+        subjectName: true,
+        validationStatus: true,
+      },
+    }),
+  ]);
+  json(res, 200, { examId, total, offset: parsedOffset, limit: parsedLimit, candidates });
+}
+
+async function handleAddExamCandidate(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  examId: string,
+  actorId: string,
+) {
+  const body = await readJsonBody(req, res);
+  if (!body) return;
+  const studentId = body.studentId;
+  if (typeof studentId !== "string" || studentId.length === 0) {
+    json(res, 400, { error: "INVALID_INPUT", message: "studentId is required" });
+    return;
+  }
+  const reason = typeof body.reason === "string" && body.reason.length > 0 ? body.reason : undefined;
+  const subjectCode = typeof body.subjectCode === "string" ? body.subjectCode : undefined;
+  const subjectName = typeof body.subjectName === "string" ? body.subjectName : undefined;
+  const candidate = await addCandidateFromMaster(
+    { examId, studentId, reason, subjectCode, subjectName },
+    actorId,
+  );
+  json(res, 200, { candidate: serializeCandidate(candidate) });
+}
+
+async function handleExcludeCandidate(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  examId: string,
+  candidateId: string,
+  actorId: string,
+) {
+  const body = await readJsonBody(req, res);
+  if (!body) return;
+  const candidate = await getCandidate(candidateId);
+  if (candidate.examId !== examId) {
+    throw new SeatingError("ExamCandidate not found", "CANDIDATE_NOT_FOUND");
+  }
+  const reason = typeof body.reason === "string" ? body.reason : "";
+  const updated = await excludeCandidate(candidateId, reason, actorId);
+  json(res, 200, { candidate: serializeCandidate(updated) });
+}
+
+async function handleReinstateCandidate(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  examId: string,
+  candidateId: string,
+  actorId: string,
+) {
+  const body = await readJsonBody(req, res);
+  if (!body) return;
+  const candidate = await getCandidate(candidateId);
+  if (candidate.examId !== examId) {
+    throw new SeatingError("ExamCandidate not found", "CANDIDATE_NOT_FOUND");
+  }
+  const reason = typeof body.reason === "string" && body.reason.length > 0 ? body.reason : undefined;
+  const updated = await reinstateCandidate(candidateId, reason, actorId);
+  json(res, 200, { candidate: serializeCandidate(updated) });
+}
+
+async function handleCancelExam(
+  req: import("node:http").IncomingMessage,
+  res: import("node:http").ServerResponse,
+  examId: string,
+  actorId: string,
+) {
+  const body = await readJsonBody(req, res);
+  if (!body) return;
+  const reason = typeof body.reason === "string" && body.reason.length > 0 ? body.reason : undefined;
+  const exam = await cancelExam(examId, actorId, reason);
+  json(res, 200, { exam: serializeExam(exam) });
 }
 
 async function handleListAuditLogs(

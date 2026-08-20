@@ -1,0 +1,72 @@
+PHASE 3 — PARTITIONED SEATING ENGINE — IMPLEMENTATION VERIFICATION RECORD
+(Evidence-only inspection of the committed implementation at 0583fb0 / HEAD 82670fc.
+Read-only: no code was modified during this close-out.)
+
+PHASE A — Physical interaction graph (solver-service/app/graph.py)
+- PhysicalSeatGraph.build(halls, adjacency=eight|cardinal): nodes built sorted by
+  (hallNumber, row, column); seat geometry validated (row letter within rows grid,
+  column within columns grid -> ValueError on out-of-grid seats).
+- Horizontal adjacency: (dr==0, dc==1). Vertical: (dr==1, dc==0).
+  Eight (default): max(dr,dc)==1 (Chebyshev 1, same hall). Cardinal: cardinal
+  only. Lines 103-105.
+- Hall isolation: cross-hall edges detected (cross_hall_edges); build rejects any
+  cross-hall edge unless allow_cross_hall_adjacency=True; isolation_errors() lists
+  them. No cross-hall edges are produced by the default same-hall rule.
+- Unknown adjacency mode -> ValueError.
+
+PHASE B — Domain partitioning (solver-service/app/partition.py)
+- _UnionFind with find (path-halving) + union (lines 52-62); connected components
+  computed from graph edges (lines 75+). Each component is one Domain (domain_id,
+  seat_indices, hall_ids, building_ids, candidate_ids).
+- verify_partition_invariants() checks: every seat in exactly one domain, every
+  seat present, and no adjacency edge crosses domains (lines 108+).
+- allocate_candidates_to_domains: deterministic balanced round-robin per department
+  (respects seat capacity); used by tests/benchmarks; deployment allocation is the
+  orchestrator's job per §11.1.
+- Ceiling: MAX_DOMAIN_CANDIDATES_DEFAULT = 1000; partition_request flags any domain
+  with candidate_count > ceiling as oversized with
+  ERR_GRAPH_TOPOLOGY_OVERSIZED_COMPONENT (solver not invoked).
+- topology_anomaly_evidence(): structured evidence (candidate_count, seat_count,
+  ceiling, hall_ids, adjacency edges within the domain) for oversized domains.
+
+GUARDS (solver-service/app/guards.py)
+- compute_composition_report -> CompositionReport with classification in
+  {BALANCED, IMBALANCE_RISK, INSUFFICIENT_CAPACITY}.
+- INSUFFICIENT_CAPACITY only when candidate_count > seat_count
+  (ERR_INSUFFICIENT_DOMAIN_CAPACITY) - a real capacity error, NOT a composition risk.
+- IMBALANCE_RISK is a pre-dispatch scheduling-risk classification produced by
+  configurable CompositionLimits ratios (largestDepartmentRatio / largestYearRatio /
+  largestCohortRatio / maxEmptySeatRatio). Ratios are risk thresholds, NOT
+  mathematical infeasibility proofs (owner correction 2026-08-15). Year/cohort risk
+  flagged only when >=2 distinct buckets exist (len(...) >= 2 guard, line 101).
+- compositionAction: warn (default) or reject -> ERR_DOMAIN_COMPOSITION_IMBALANCE.
+
+PHASE C — Seat-label channeling solver (solver-service/app/seatlabel.py)
+- X[c,s]: NewBoolVar X_{s}_{ci} (line 89). O[s]: occupancy bool (line 91).
+  D[s]/Y[s]/K[s]: NewIntVar over 0..len, index 0 = EMPTY sentinel (lines 92-99).
+  K only created when cohorts present (policy COHORT), Y only when years present -
+  K/Y are "only where required".
+- Channeling by linear weighted sums: D[s] == sum_c X[c,s]*deptIndex(c); same for
+  Y/K. EMPTY (all X=0) => label 0.
+- One seat per candidate: sum_s X[c,s] == 1 for every domain candidate (line 111);
+  one candidate per seat: sum_c X[c,s] <= 1; O[s] == sum_c X[c,s].
+- Anti-adjacency reified ON OCCUPANCY (OnlyEnforceIf([O[i],O[j]]), never blind
+  label inequality): DEPARTMENT_ONLY => D[i]!=D[j]; STRICT_DEPT_OR_YEAR =>
+  D[i]!=D[j] AND Y[i]!=Y[j]; COHORT => K[i]!=K[j] (lines 138-143).
+- Policy modes from SolverConfig.policyMode (DEPARTMENT_ONLY default).
+- Objective: minimize adjacent OCCUPIED same-department pairs (soft; forced 0 under
+  DEPARTMENT_ONLY / STRICT_DEPT_OR_YEAR).
+- Objective reporting (§18): OPTIMAL reports int(round(solver.ObjectiveValue())) and
+  MUST equal validator sameDepartmentAdjacentCount, else ERR_VALIDATOR_MISMATCH
+  (lines 388-397); FEASIBLE reports the validator-derived value.
+- Validator mismatch handling: ERR_VALIDATOR_MISMATCH (reported != validator),
+  ERR_INVALID_ASSIGNMENT (duplicate candidate/seat or policy violation).
+- Policy requiring year without year present -> ERR_INVALID_POLICY_CONFIGURATION.
+- Ceiling enforced before CP-SAT: oversized domain -> ERR_GRAPH_TOPOLOGY_OVERSIZED_COMPONENT
+  (lines 463, 517, 612). Composition guard: INSUFFICIENT_CAPACITY -> INFEASIBLE
+  (ERR_INSUFFICIENT_DOMAIN_CAPACITY); IMBALANCE_RISK + reject -> ERROR
+  (ERR_DOMAIN_COMPOSITION_IMBALANCE).
+
+VERIFICATION SUMMARY: all Phase A-C architecture elements claimed in the milestone
+report are present in the committed implementation. No discrepancies found in this
+inspection.

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ApiError, getExams } from "../lib/api";
 import type { Exam } from "../lib/types";
 import { Alert, PageLoader } from "./ui";
@@ -83,13 +83,18 @@ export function ExamSelectionPage() {
                   {exam.status}
                 </span>
               </div>
-              <button
-                type="button"
-                className="button button--primary"
-                onClick={() => selectExam(exam)}
-              >
-                Select
-              </button>
+              <div className="form-actions">
+                <Link className="button button--ghost" to={`/exams/${exam.id}/candidates`}>
+                  Manage candidates
+                </Link>
+                <button
+                  type="button"
+                  className="button button--primary"
+                  onClick={() => selectExam(exam)}
+                >
+                  Select
+                </button>
+              </div>
             </div>
           ))}
         </div>

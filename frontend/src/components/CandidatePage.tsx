@@ -209,6 +209,11 @@ export function CandidatePage() {
       )}
 
       <div className="form-actions">
+        {isAdmin && document && (
+          <Link className="button button--ghost" to={`/exams/${document.examId}/candidates`}>
+            Manage all candidates for this exam
+          </Link>
+        )}
         <Link className="button button--ghost" to={`/documents/${documentId}`}>
           Back to ingestion status
         </Link>

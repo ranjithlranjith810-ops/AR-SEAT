@@ -16,6 +16,7 @@ import { seedDatabase } from "../../prisma/seed.ts";
 import { createExam } from "../../src/services/exam.service.ts";
 import { createUser } from "../../src/phase4/auth/users.ts";
 import { ingestExamDocument } from "../../src/services/exam-document/ingest.ts";
+import { logAudit } from "../../src/services/audit.service.ts";
 import { annaFixtureLines, buildPdf } from "../../tests/fixture-pdf.ts";
 
 const E2E_ADMIN_USERNAME = process.env.E2E_ADMIN_USERNAME ?? "e2e-admin";
@@ -76,8 +77,52 @@ async function main() {
     { actorId: undefined },
   );
 
+  const conflictExam = await createExam({
+    examDate: new Date("2026-05-12T00:00:00Z"),
+    session: "FN",
+    examType: "UNIVERSITY",
+  });
+  const conflictPdf = await buildPdf(
+    annaFixtureLines(
+      [
+        { serial: "1", registerNumber: "DEMO-CSE-005", name: "Student 005" },
+        { serial: "2", registerNumber: "DEMO-CSE-006", name: "Student 006" },
+      ],
+      { date: "12.05.2026", session: "FN" },
+    ),
+  );
+  await ingestExamDocument(
+    conflictExam.id,
+    "conflict-fixture.pdf",
+    "application/pdf",
+    new Uint8Array(conflictPdf),
+    { actorId: undefined },
+  );
+
+  const manageExam = await createExam({
+    examDate: new Date("2026-05-12T00:00:00Z"),
+    session: "FN",
+    examType: "UNIVERSITY",
+  });
+
+  const cancelExam = await createExam({
+    examDate: new Date("2026-05-14T00:00:00Z"),
+    session: "AN",
+    examType: "UNIVERSITY",
+  });
+
   const admin = await upsertUser(E2E_ADMIN_USERNAME, E2E_ADMIN_PASSWORD, "ADMIN");
   const staff = await upsertUser(E2E_STAFF_USERNAME, E2E_STAFF_PASSWORD, "STAFF");
+
+  // An actor-bearing audit entry written through the real logAudit path so the
+  // Phase 16 audit-read surface can resolve the acting ADMIN end-to-end.
+  const auditPlanEntityId = "e2e-seed-plan";
+  await logAudit({
+    actorId: admin.id,
+    action: "PLAN_APPROVED",
+    entityType: "SeatingPlan",
+    entityId: auditPlanEntityId,
+  });
 
   const state = {
     admin: { username: admin.username, password: E2E_ADMIN_PASSWORD },
@@ -85,6 +130,10 @@ async function main() {
     goldenExam: { id: goldenExam.id },
     roleExam: { id: roleExam.id },
     roleDocument: { id: roleReport.documentId, parseStatus: roleReport.finalParseStatus },
+    conflictExam: { id: conflictExam.id },
+    manageExam: { id: manageExam.id },
+    cancelExam: { id: cancelExam.id },
+    auditPlan: { entityId: auditPlanEntityId },
   };
 
   const statePath = process.env.E2E_SEED_STATE ?? path.resolve("e2e", "seed-state.json");
@@ -94,6 +143,7 @@ async function main() {
   console.log(
     `[e2e-seed] goldenExam=${goldenExam.id} roleExam=${roleExam.id} ` +
       `roleDocument=${roleReport.documentId} status=${roleReport.finalParseStatus} ` +
+      `conflictExam=${conflictExam.id} manageExam=${manageExam.id} cancelExam=${cancelExam.id} ` +
       `admin=${admin.username} staff=${staff.username}`,
   );
   console.log(`[e2e-seed] wrote ${statePath}`);

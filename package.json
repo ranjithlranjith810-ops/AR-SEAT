@@ -15,7 +15,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:test:setup": "node scripts/setup-test-db.mjs",
     "test": "node scripts/run-tests.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dev:all": "node scripts/dev-all.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

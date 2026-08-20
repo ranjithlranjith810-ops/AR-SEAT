@@ -7,6 +7,10 @@ export interface SeedState {
   goldenExam: { id: string };
   roleExam: { id: string };
   roleDocument: { id: string; parseStatus: string };
+  conflictExam: { id: string };
+  manageExam: { id: string };
+  cancelExam: { id: string };
+  auditPlan: { entityId: string };
 }
 
 export function loadSeedState(): SeedState {

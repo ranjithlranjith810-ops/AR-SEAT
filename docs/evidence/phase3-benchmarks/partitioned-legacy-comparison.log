@@ -1,0 +1,31 @@
+PHASE 3 — LEGACY vs PARTITIONED COMPARISON (CHECKPOINT 6)
+Labels per protocol: LEGACY MONOLITHIC MEASURED RESULT vs
+PARTITIONED FORMULATION MEASURED RESULT. Same 1000-student, 10-hall,
+10-department, 5x20 grid distribution, random_seed=42, 8 workers, 8-neighbourhood.
+
+LEGACY MONOLITHIC MEASURED RESULT
+  Source: docs/evidence/phase3-benchmarks/1000-production-8w-fixed.log
+  Engine: Approach C / Encoding D, hardRuleScope=class, single monolithic CP-SAT.
+  status=FEASIBLE, objectiveValue=272, solverDurationMs=139734 (139.7 s),
+  memoryPeak=4518.9 MB, variableCount=203270, constraintCount=233900,
+  assignedCount=1000, unassignedCount=0, structuralErrors=[], valid=True,
+  OPTIMALITY = NOT PROVEN. EXIT CODE 0.
+
+PARTITIONED FORMULATION MEASURED RESULT
+  Source: docs/evidence/phase3-benchmarks/phaseE-seatlabel-200-500-800-1000.log
+  Engine: seat-label (X/O/D/Y/K) per physical-domain component (10 domains),
+  policy DEPARTMENT_ONLY.
+  status=OPTIMAL, objective=0, validatorObjective=0,
+  modelBuildMs=1800.7 + solveMs=36800.8 = totalDurationMs=38601.8 (38.6 s),
+  wallClockMs=38807, memoryPeak=425.4 MB, variableCount=105270,
+  constraintCount=13810, assignedCount=1000, unassignedCount=0, valid=True,
+  every domain OPTIMAL, all candidates seated.
+
+OBSERVATIONS (measured results, not claims of generality)
+  - Legacy monolithic: 139.7 s wall, 4518.9 MB peak, FEASIBLE (optimality not proven,
+    objective 272 same-department adjacent pairs).
+  - Partitioned (10 domains): 38.6 s wall, 425.4 MB peak, OPTIMAL, objective 0.
+  - The 1000-student comparison is the SAME workload as the earlier legacy
+    monolithic run; both are measured results on this host.
+  - NOT benchmarked here: 4,000 / 10,000 monolithic (still out of scope per the
+    approved architecture; the 4,000+ path is sessions x domains, each <= 1000).

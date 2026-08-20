@@ -1,15 +1,23 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   approveSeatingPlan,
+  changeStudentStatus,
+  createDepartment,
+  createStudent,
   generateSeating,
+  getAuditLogs,
   getDocumentCandidates,
   getExams,
   getGenerationStatus,
   getMe,
   getSeatingPlan,
+  listClasses,
+  listDepartments,
+  listStudents,
   login,
   publishSeatingPlan,
   resolveCandidate,
+  updateStudent,
   uploadDocument,
 } from "./api";
 import type { Candidate, CandidatePage, GenerationCreated, IngestReport, PublicUser } from "./types";
@@ -124,6 +132,32 @@ describe("api client", () => {
     expect(page.offset).toBe(40);
     const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
     expect(url).toBe("/exam-seating/documents/doc-1/candidates?limit=20&offset=40");
+  });
+
+  it("getAuditLogs fetches the audit page with the default empty query", async () => {
+    stubFetchOnce({ status: 200, body: { items: [], total: 0, limit: 20, offset: 0 } });
+    const page = await getAuditLogs();
+    expect(page.total).toBe(0);
+    const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url).toBe("/exam-seating/audit-logs");
+  });
+
+  it("getAuditLogs serializes only non-empty query fields", async () => {
+    stubFetchOnce({ status: 200, body: { items: [], total: 0, limit: 20, offset: 10 } });
+    await getAuditLogs({
+      limit: 20,
+      offset: 10,
+      action: "EXAM_CREATED",
+      entityType: "Exam",
+      entityId: "exam /1",
+      actorId: "u 1",
+      from: "2026-01-01T00:00:00.000Z",
+      to: "",
+    });
+    const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url).toBe(
+      "/exam-seating/audit-logs?limit=20&offset=10&action=EXAM_CREATED&entityType=Exam&entityId=exam+%2F1&actorId=u+1&from=2026-01-01T00%3A00%3A00.000Z",
+    );
   });
 
   it("getExams fetches the backend exam list", async () => {
@@ -335,5 +369,141 @@ describe("api client", () => {
       RequestInit,
     ];
     expect((init.headers as Record<string, string>)["X-File-Name"]).toBe("document.pdf");
+  });
+
+  it("listStudents serializes search/filter/pagination query fields", async () => {
+    stubFetchOnce({
+      status: 200,
+      body: { students: [], total: 0, limit: 20, offset: 0 },
+    });
+    await listStudents({
+      search: "ram",
+      departmentId: "dept /1",
+      classId: "cls 1",
+      status: "ACTIVE",
+      limit: 20,
+      offset: 40,
+    });
+    const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url).toBe(
+      "/exam-seating/students?search=ram&departmentId=dept+%2F1&classId=cls+1&status=ACTIVE&limit=20&offset=40",
+    );
+  });
+
+  it("listStudents omits empty query fields", async () => {
+    stubFetchOnce({ status: 200, body: { students: [], total: 0, limit: 20, offset: 0 } });
+    await listStudents({ limit: 20, offset: 0 });
+    const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url).toBe("/exam-seating/students?limit=20&offset=0");
+  });
+
+  it("createStudent POSTs the payload and unwraps the student", async () => {
+    stubFetchOnce({
+      status: 200,
+      body: { student: { id: "stu-1", registerNumber: "REG-1", status: "ACTIVE" } },
+    });
+    const student = await createStudent({
+      name: "RAMYA S",
+      rollNumber: "CSE333",
+      registerNumber: "REG-1",
+      gender: "FEMALE",
+      classId: "cls-1",
+      status: "ACTIVE",
+    });
+    expect(student).toMatchObject({ id: "stu-1", registerNumber: "REG-1" });
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe("/exam-seating/students");
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe(
+      JSON.stringify({
+        name: "RAMYA S",
+        rollNumber: "CSE333",
+        registerNumber: "REG-1",
+        gender: "FEMALE",
+        classId: "cls-1",
+        status: "ACTIVE",
+      }),
+    );
+  });
+
+  it("createStudent surfaces a duplicate register number as 409 STUDENT_ALREADY_EXISTS", async () => {
+    stubFetchOnce({
+      status: 409,
+      body: { error: "STUDENT_ALREADY_EXISTS", message: "Student register number already exists" },
+    });
+    await expect(
+      createStudent({
+        name: "DUP",
+        rollNumber: "R1",
+        registerNumber: "REG-1",
+        gender: "MALE",
+        classId: "cls-1",
+        status: "ACTIVE",
+      }),
+    ).rejects.toMatchObject({ status: 409, code: "STUDENT_ALREADY_EXISTS" });
+  });
+
+  it("updateStudent PATCHes the encoded id with only provided fields", async () => {
+    stubFetchOnce({ status: 200, body: { student: { id: "stu/1", status: "ACTIVE" } } });
+    await updateStudent("stu/1", { name: "NEW NAME" });
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe("/exam-seating/students/stu%2F1");
+    expect(init.method).toBe("PATCH");
+    expect(init.body).toBe(JSON.stringify({ name: "NEW NAME" }));
+  });
+
+  it("changeStudentStatus PATCHes the status route", async () => {
+    stubFetchOnce({ status: 200, body: { student: { id: "stu-1", status: "INACTIVE" } } });
+    const student = await changeStudentStatus("stu-1", "INACTIVE");
+    expect(student).toMatchObject({ status: "INACTIVE" });
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe("/exam-seating/students/stu-1/status");
+    expect(init.method).toBe("PATCH");
+    expect(init.body).toBe(JSON.stringify({ status: "INACTIVE" }));
+  });
+
+  it("listDepartments fetches the backend department list", async () => {
+    stubFetchOnce({
+      status: 200,
+      body: { departments: [{ id: "dept-1", code: "CSE", name: "Computer Science and Engineering" }] },
+    });
+    const departments = await listDepartments();
+    expect(departments).toHaveLength(1);
+    expect(departments[0]).toMatchObject({ code: "CSE" });
+    const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url).toBe("/exam-seating/departments");
+  });
+
+  it("createDepartment POSTs code and name", async () => {
+    stubFetchOnce({ status: 200, body: { department: { id: "dept-1", code: "IT" } } });
+    const department = await createDepartment({ code: "IT", name: "Information Technology" });
+    expect(department).toMatchObject({ code: "IT" });
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe("/exam-seating/departments");
+    expect(init.body).toBe(JSON.stringify({ code: "IT", name: "Information Technology" }));
+  });
+
+  it("listClasses sends the departmentId filter when provided", async () => {
+    stubFetchOnce({ status: 200, body: { classes: [] } });
+    await listClasses("dept-1");
+    const [url] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url).toBe("/exam-seating/classes?departmentId=dept-1");
+
+    stubFetchOnce({ status: 200, body: { classes: [] } });
+    await listClasses();
+    const [url2] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url2).toBe("/exam-seating/classes");
   });
 });

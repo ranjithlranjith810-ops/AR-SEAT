@@ -176,6 +176,38 @@ export interface CandidatePage {
   candidates: Candidate[];
 }
 
+export interface ExamCandidateRef {
+  candidateId: string;
+  examId: string;
+  status: string;
+  subjectCode: string;
+  subjectName: string;
+  validationStatus: string;
+}
+
+export interface ExamConflict {
+  studentId: string;
+  registerNumber: string;
+  studentName: string;
+  candidate: ExamCandidateRef;
+  conflictingExams: ExamCandidateRef[];
+}
+
+export interface ExamConflictReport {
+  examId: string;
+  examDate: string;
+  session: ExamSession;
+  conflicts: ExamConflict[];
+}
+
+export interface ExamCandidatePage {
+  examId: string;
+  total: number;
+  offset: number;
+  limit: number;
+  candidates: Candidate[];
+}
+
 export type GenerationState =
   | "CREATED"
   | "PARTITIONING"
@@ -288,6 +320,11 @@ export const AUDIT_ACTIONS = [
   "BENCH_STATUS_CHANGED",
   "BENCH_SEAT_ASSIGNED",
   "BENCH_SEAT_REMOVED",
+  "EXAM_CANCELLED",
+  "EXAM_CONFLICT_CHECKED",
+  "EXAM_CANDIDATE_ADDED",
+  "EXAM_CANDIDATE_EXCLUDED",
+  "EXAM_CANDIDATE_REINSTATED",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

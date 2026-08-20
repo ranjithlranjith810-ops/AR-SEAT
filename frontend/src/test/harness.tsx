@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { render } from "@testing-library/react";
-import { AuthContext } from "../auth/AuthContext";
+import { AuthContext } from "../auth/auth-context";
 import type { PublicUser } from "../lib/types";
 
 export const adminUser: PublicUser = { id: "admin-1", username: "admin", role: "ADMIN" };

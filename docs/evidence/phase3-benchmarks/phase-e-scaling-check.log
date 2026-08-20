@@ -1,0 +1,30 @@
+PHASE 3 — PHASE E SCALING EVIDENCE CHECK
+Source: docs/evidence/phase3-benchmarks/phaseE-seatlabel-200-500-800-1000.log
+(committed run of benchmark_seatlabel.py, policy DEPARTMENT_ONLY, adjacency=eight,
+num_search_workers=8, random_seed=42, perDomainTimeLimitSeconds=60).
+
+BUCKET SUMMARY (all buckets: status=OPTIMAL, objective=0, validatorObjective=0,
+assignedCount=N, unassignedCount=0, valid=True, all domains OPTIMAL):
+  200 candidates: 2 halls, 2 domains, largest domain 100,
+      modelBuildMs=370.1, solveMs=5691.3, totalDurationMs=6061.5, wallClockMs=6097,
+      vars=21054, cons=2762, memoryPeak=296.4 MB, cpuPeak=715.7%
+  500 candidates: 5 halls, 5 domains, largest domain 100,
+      modelBuildMs=868.6, solveMs=15602.7, totalDurationMs=16471.4, wallClockMs=16568,
+      vars=52635, cons=6905, memoryPeak=327.8 MB, cpuPeak=728.2%
+  800 candidates: 8 halls, 8 domains, largest domain 100,
+      modelBuildMs=1582.0, solveMs=27704.9, totalDurationMs=29287.2, wallClockMs=29495,
+      vars=84216, cons=11048, memoryPeak=373.1 MB, cpuPeak=732.2%
+  1000 candidates: 10 halls, 10 domains, largest domain 100,
+      modelBuildMs=1800.7, solveMs=36800.8, totalDurationMs=38601.8, wallClockMs=38807,
+      vars=105270, cons=13810, memoryPeak=425.4 MB, cpuPeak=750.6%
+
+DOMAIN COUNT SCALES WITH PHYSICAL COMPONENTS (2/5/8/10 domains), largest domain
+held at 100 candidates in every bucket (partitioning prevents any single CP-SAT
+domain from exceeding the 1000 ceiling; benchmark domains are ~100). Wall clock
+is dominated by per-domain solve time (sum over 100-candidate domains).
+PHASE E EXIT CODE = 0; every BUCKET = PASS.
+
+Interpretation consistent with the partitioned engine: total time grows linearly
+with the number of domains because each 100-candidate domain costs ~2.6-4.7s to
+solve; memory stays bounded (single-domain footprint ~ tens of MB). No scaling
+anomaly; no domain exceeded the ceiling; all candidates seated.

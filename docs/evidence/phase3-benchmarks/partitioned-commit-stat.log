@@ -1,0 +1,23 @@
+﻿0583fb0 feat: session & physical-domain partitioned seating engine (phase A-E)
+ .../phase3-benchmarks/git-diff-name-only.log       |  23 +-
+ docs/evidence/phase3-benchmarks/git-diff-stat.log  |  30 +-
+ docs/evidence/phase3-benchmarks/git-log.log        |   7 +-
+ docs/evidence/phase3-benchmarks/git-status.log     |  49 +-
+ .../phaseD-legacy-vs-seatlabel-50-100-200-300.log  |  10 +
+ .../phaseE-seatlabel-200-500-800-1000.log          | 135 ++++
+ .../seatlabel-engine-checkpoint.log                |  93 +++
+ docs/phase3-benchmarks.md                          |  58 +-
+ docs/phase3-cpsat-spec.md                          |  41 +-
+ solver-service/app/graph.py                        | 156 +++++
+ solver-service/app/guards.py                       | 133 ++++
+ solver-service/app/models.py                       |   8 +
+ solver-service/app/partition.py                    | 217 ++++++
+ solver-service/app/seatlabel.py                    | 752 +++++++++++++++++++++
+ solver-service/benchmarks/benchmark_phase_d.py     | 111 +++
+ solver-service/benchmarks/benchmark_seatlabel.py   | 142 ++++
+ solver-service/benchmarks/dataset.py               |  93 +++
+ solver-service/tests/test_graph.py                 |  78 +++
+ solver-service/tests/test_guards.py                |  64 ++
+ solver-service/tests/test_partition.py             |  85 +++
+ solver-service/tests/test_seatlabel.py             | 120 ++++
+ 21 files changed, 2324 insertions(+), 81 deletions(-)

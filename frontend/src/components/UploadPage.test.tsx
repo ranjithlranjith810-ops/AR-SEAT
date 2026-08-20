@@ -7,7 +7,7 @@ import type { Exam, IngestReport } from "../lib/types";
 import { RequireAdmin } from "../auth/guards";
 import { UploadPage } from "./UploadPage";
 import { adminUser, noopAuth, renderWithAuth, staffUser } from "../test/harness";
-import { AuthContext } from "../auth/AuthContext";
+import { AuthContext } from "../auth/auth-context";
 
 vi.mock("../lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/api")>();

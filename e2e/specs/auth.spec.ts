@@ -41,7 +41,10 @@ test.describe("authentication boundaries", () => {
     await page.getByRole("button", { name: "Log out" }).click();
     await expect(page).toHaveURL(/\/login/);
 
-    const afterLogout = await context.request.get("/auth/me");
-    expect(afterLogout.status()).toBe(401);
+    // The session row is deleted server-side during logout; poll until the
+    // invalidation is observable rather than racing the deletion commit.
+    await expect
+      .poll(async () => (await context.request.get("/auth/me")).status(), { timeout: 10_000 })
+      .toBe(401);
   });
 });

@@ -1,0 +1,140 @@
+PHASE 3 — PARTITIONED SEATING ENGINE — EVIDENCE-ONLY CLOSE-OUT CHECKPOINT
+Spec revision used: the owner-provided evidence-only close-out + verification
+protocol (with replacement Checkpoint 4 objective-triple retrieval rule and
+replacement Checkpoint 8 pytest rule).
+Date: 2026-08-15
+Rules: evidence-only. NO source/test/benchmark/prisma/app modifications. NO
+commits, NO push, NO amend/reset. No 4,000/10,000 monolithic runs. No Node worker.
+
+CHECKPOINT 0
+TIMESTAMP: 2026-08-15
+STATUS: COMPLETE
+DESCRIPTION: Repository baseline. HEAD=82670fc275a7e1ce9c0079a42d87cdf1f5b24640,
+ORIGIN/MAIN=82670fc275a7e1ce9c0079a42d87cdf1f5b24640, HEAD_MATCHES_ORIGIN=YES.
+Claimed commits verified present: 0583fb0 (partitioned seating engine),
+82670fc (post-commit git evidence capture). git log --oneline -5 captured.
+git diff --stat and --name-only = empty (no tracked working-tree changes).
+git status shows only untracked strays (docs/phase3-discovery.md,
+"eating prototype*") plus the evidence files created by this close-out.
+Evidence: partitioned-git-status.log, partitioned-git-log.log,
+partitioned-git-diff-stat.log, partitioned-git-diff-name-only.log.
+CHECKPOINT 1
+TIMESTAMP: 2026-08-15
+STATUS: COMPLETE
+DESCRIPTION: Working tree verification. git show --stat --oneline 0583fb0
+confirms app/graph.py (156), app/partition.py (217), app/guards.py (133),
+app/seatlabel.py (752), app/models.py (+8), tests test_graph/test_guards/
+test_partition/test_seatlabel, benchmarks benchmark_phase_d/benchmark_seatlabel,
+dataset.py, docs phase3-benchmarks.md + phase3-cpsat-spec.md, and Phase D/E
+evidence logs. 82670fc adds git-final-* evidence capture. Implementation is
+represented by the claimed commit(s).
+Evidence: partitioned-commit-stat.log.
+
+CHECKPOINT 2
+TIMESTAMP: 2026-08-15
+STATUS: COMPLETE
+DESCRIPTION: Phase A-C implementation verified by read-only inspection of the
+committed sources (graph.py, partition.py, guards.py, seatlabel.py at 0583fb0).
+Confirmed: eight/cardinal same-hall adjacency + hall isolation (A); Union-Find
+connected-component domains, per-domain invariants, ceiling 1000 with
+ERR_GRAPH_TOPOLOGY_OVERSIZED_COMPONENT (B); guards with BALANCED/IMBALANCE_RISK/
+INSUFFICIENT_CAPACITY (risk ratios are configurable thresholds, capacity error is
+candidates>seats; year/cohort risk only when >=2 buckets) (guards); seat-label
+X/O/D/Y/K channeling, occupancy-reified anti-adjacency OnlyEnforceIf, per-candidate
+sum==1, policy modes, OPTIMAL==validator objective reporting (C). No discrepancies
+found.
+Evidence: partitioned-implementation-check.log.
+
+CHECKPOINT 3
+TIMESTAMP: 2026-08-15
+STATUS: COMPLETE
+DESCRIPTION: Phase D objective evidence verified. Log phaseD-legacy-vs-seatlabel-
+50-100-200-300.log: for sizes 50/100/200/300 legacy and new both OPTIMAL,
+newObjective=0, sameDepartmentAdjacent=0, newPassesValidator=true, all assigned,
+equivalence=true each. ALL_EQUIVALENCE_PASS=True, PHASE D = PASS. Reported
+objective equals validator for every size.
+Evidence: phase-d-objective-check.log.
+
+CHECKPOINT 4 (REPLACED)
+TIMESTAMP: 2026-08-15
+STATUS: COMPLETE
+DESCRIPTION: Phase E objective triple retrieved from EXISTING evidence
+(OBJECTIVE_EVIDENCE_RETRIEVAL = EXISTING_EVIDENCE; no re-run, no modification).
+Attribution from committed code: OPTIMAL reported objective = int(round
+(solver.ObjectiveValue())) (seatlabel.py:383), gated to equal validator
+sameDepartmentAdjacentCount (:381-399). Representative domain (1000-bucket
+component-00): candidates=100 seats=100 status=OPTIMAL assigned=100 unassigned=0
+valid=True structural_errors=[] raw=0 reported=0 validator=0. All 25 Phase E
+domains: raw == reported == validator == 0, all OPTIMAL. Gate
+reported==validator + structural validity = PASS.
+Evidence: phase-e-objective-triple.log.
+
+CHECKPOINT 5
+TIMESTAMP: 2026-08-15
+STATUS: COMPLETE
+DESCRIPTION: Phase E scaling evidence verified from committed
+phaseE-seatlabel-200-500-800-1000.log. Buckets 200/500/800/1000 all OPTIMAL,
+objective 0, all candidates seated, valid=True. Domain count scales with physical
+components (2/5/8/10), largest domain held at 100 candidates; total time dominated
+by per-domain solve sum (linear in domain count); memory bounded (296-425 MB).
+PHASE E EXIT CODE = 0. No scaling anomaly; ceiling never exceeded.
+Evidence: phase-e-scaling-check.log.
+
+CHECKPOINT 6
+TIMESTAMP: 2026-08-15
+STATUS: COMPLETE
+DESCRIPTION: Legacy comparison verified. LABELED LEGACY MONOLITHIC MEASURED RESULT:
+1000-production-8w-fixed.log, Approach C/Encoding D single model, FEASIBLE,
+objectiveValue 272, 139.7 s, 4518.9 MB, 203270 vars / 233900 cons, valid, optimality
+not proven. PARTITIONED FORMULATION MEASURED RESULT: 10 domains, OPTIMAL, objective 0,
+38.6 s, 425.4 MB, 105270 vars / 13810 cons, all seated. Both are measured results
+for the same 1000-student workload. No claim that 4,000 or 10,000 were benchmarked.
+Evidence: partitioned-legacy-comparison.log.
+
+CHECKPOINT 7
+TIMESTAMP: 2026-08-15
+STATUS: COMPLETE
+DESCRIPTION: npm test NOT re-run this session (npm test was aborted by the owner
+during implementation; the frozen npm-test.log was restored from git and is tracked).
+NPM_TEST_THIS_SESSION = NOT_VERIFIED. FROZEN_PHASE2_BASELINE = 85 passed / 3
+skipped (88), 12 test files passed / 1 skipped (13), from committed npm-test.log.
+This baseline is NOT claimed as reverified in this close-out. Absence of prisma/src
+diffs (CP9) is scope evidence only, not a fresh npm test.
+Evidence: npm-test.log (tracked, committed).
+
+CHECKPOINT 8 (REPLACED)
+TIMESTAMP: 2026-08-15
+STATUS: COMPLETE
+DESCRIPTION: pytest -q run fresh this session from solver-service with the venv
+interpreter (OR-Tools 9.15.6755). ACTUAL RESULT: 80 passed, 1 warning
+(StarletteDeprecationWarning), exit code 0. Result exactly matches the previously
+reported 80 passed -> no count difference, no regression. No failures, no
+collection errors, no import errors. Tests not modified.
+Evidence: partitioned-pytest.log.
+
+CHECKPOINT 9
+TIMESTAMP: 2026-08-15
+STATUS: COMPLETE
+DESCRIPTION: Scope verification. git diff --name-only (tracked vs HEAD) = EMPTY.
+git status shows only: the 12 evidence logs created by this close-out under
+docs/evidence/phase3-benchmarks/ (untracked, not staged, not committed) and the two
+pre-existing strays (docs/phase3-discovery.md, "eating prototype*") which were NOT
+staged or deleted. No prisma/ or src/ tracked or untracked changes.
+No unintended files staged.
+
+CHECKPOINT 10 (FINAL CLASSIFICATION)
+TIMESTAMP: 2026-08-15
+STATUS: COMPLETE
+DESCRIPTION: FINAL_CLASSIFICATION = CASE A - FULLY VERIFIED.
+Justification: git provenance matches (HEAD == origin/main == 82670fc, claimed
+commits 0583fb0/82670fc present); implementation verified by read-only inspection
+(Phase A-C complete, no defect found); objective evidence valid (Phase D equivalence
+PASS; Phase E objective triple raw==reported==validator==0 with structural validity,
+authoritative gate PASS); scaling evidence complete and consistent (200/500/800/1000,
+all OPTIMAL, bounded memory, linear-in-domain-count time); legacy comparison correctly
+labeled (LEGACY MONOLITHIC MEASURED RESULT vs PARTITIONED FORMULATION MEASURED
+RESULT; no 4,000/10,000 claim); regression: pytest completed with no test failures
+(80 passed, identical to previously reported count) and npm documented as
+NPM_TEST_THIS_SESSION=NOT_VERIFIED with the frozen baseline explicitly NOT claimed
+as reverified; scope clean (no prisma/src diffs, only close-out evidence logs added,
+strays untouched). No STOP condition was triggered at any checkpoint.

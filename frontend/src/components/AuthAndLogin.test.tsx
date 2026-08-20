@@ -7,7 +7,7 @@ import { ApiError } from "../lib/api";
 import { RequireAdmin, RequireAuth } from "../auth/guards";
 import { LoginPage } from "./LoginPage";
 import { adminUser, noopAuth, renderRoutes, renderWithAuth, staffUser } from "../test/harness";
-import { AuthContext } from "../auth/AuthContext";
+import { AuthContext } from "../auth/auth-context";
 import type { PublicUser } from "../lib/types";
 
 describe("route protection", () => {

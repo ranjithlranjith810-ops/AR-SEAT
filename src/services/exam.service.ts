@@ -65,3 +65,44 @@ export async function transitionExamStatus(
   assertExamTransition(exam.status, to);
   return prisma.exam.update({ where: { id }, data: { status: to } });
 }
+
+export async function cancelExam(id: string, actorId?: string, reason?: string) {
+  const exam = await getExam(id);
+  assertExamTransition(exam.status, "CANCELLED");
+
+  const activeJob = await prisma.solveJob.count({
+    where: { examId: id, status: { in: ["QUEUED", "RUNNING"] } },
+  });
+  if (activeJob > 0) {
+    throw new SeatingError(
+      "Cannot cancel the exam while a seating generation is in progress",
+      "EXAM_CANCELLATION_BLOCKED_ACTIVE_GENERATION",
+    );
+  }
+
+  const updated = await prisma.exam.update({ where: { id }, data: { status: "CANCELLED" } });
+  await logAudit({
+    action: "EXAM_CANCELLED",
+    entityType: "Exam",
+    entityId: id,
+    actorId,
+    metadata: reason ? { reason } : undefined,
+  });
+  return updated;
+}
+
+export async function assertExamCandidatesMutable(examId: string) {
+  const exam = await getExam(examId);
+  if (
+    exam.status === "GENERATING" ||
+    exam.status === "APPROVED" ||
+    exam.status === "PUBLISHED" ||
+    exam.status === "CANCELLED"
+  ) {
+    throw new SeatingError(
+      `Exam candidate roster is locked: the exam is ${exam.status}`,
+      "EXAM_NOT_MUTABLE",
+    );
+  }
+  return exam;
+}

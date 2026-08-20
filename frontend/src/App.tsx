@@ -4,6 +4,7 @@ import { RequireAdmin, RequireAuth } from "./auth/guards";
 import { AuditPage } from "./components/AuditPage";
 import { CandidatePage } from "./components/CandidatePage";
 import { DocumentStatusPage } from "./components/DocumentStatusPage";
+import { ExamCandidatesPage } from "./components/ExamCandidatesPage";
 import { ExamSelectionPage } from "./components/ExamSelectionPage";
 import { GenerationStatusPage } from "./components/GenerationStatusPage";
 import { HallsPage } from "./components/HallsPage";
@@ -51,6 +52,14 @@ export default function App() {
               element={
                 <RequireAdmin>
                   <ExamSelectionPage />
+                </RequireAdmin>
+              }
+            />
+            <Route
+              path="/exams/:examId/candidates"
+              element={
+                <RequireAdmin>
+                  <ExamCandidatesPage />
                 </RequireAdmin>
               }
             />

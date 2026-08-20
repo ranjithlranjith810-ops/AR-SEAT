@@ -1,0 +1,36 @@
+PHASE 3 — PHASE E OBJECTIVE TRIPLE (REPLACED CHECKPOINT 4)
+Source: docs/evidence/phase3-benchmarks/phaseE-seatlabel-200-500-800-1000.log
+(committed run of benchmark_seatlabel.py, code unchanged at 0583fb0 / HEAD 82670fc).
+
+ATTRIBUTION (from committed code, read-only): for OPTIMAL domains the reported
+"objective" field IS int(round(solver.ObjectiveValue())) (seatlabel.py:383) and is
+gated to equal the validator sameDepartmentAdjacentCount (seatlabel.py:381-399);
+"validatorObjective" (aggregate) is the validator count. No ERR_VALIDATOR_MISMATCH
+occurred anywhere. Therefore the triple below is fully recoverable from the
+committed evidence.
+
+REPRESENTATIVE DOMAIN (1000-bucket, component-00):
+  candidate_count  = 100
+  seat_count       = 100
+  status           = OPTIMAL
+  assigned         = 100
+  unassigned       = 0
+  valid            = True (aggregate log line "valid=True")
+  structural_errors = [] (report gates for duplicate candidates/seats and policy
+                        violations all passed; ERR_INVALID_ASSIGNMENT never raised)
+  raw_solver_objective    = 0  (= int(round(solver.ObjectiveValue())), OPTIMAL path)
+  reported_objective      = 0  (= "objective" field)
+  validator_objective     = 0  (= "validatorObjective")
+
+ALL 25 DOMAINS (4 buckets: 200/500/800/1000 -> 2+5+8+10 domains):
+  every domain status=OPTIMAL, objective=0, assigned=100, unassigned=0,
+  candidates=100, seats=100; raw == reported == validator == 0 everywhere;
+  aggregate valid=True for every bucket.
+
+OBJECTIVE_EVIDENCE_RETRIEVAL = EXISTING_EVIDENCE
+  (triple present in committed evidence; NO re-run performed; NO modification
+  required. RERUN_REQUIRED / NOT_AVAILABLE not applicable.)
+
+AUTHORITATIVE GATE (reported == validator + structural validity): PASS
+  reported_objective(0) == validator_objective(0), valid=True, no structural_errors,
+  all candidates seated in every Phase E domain.

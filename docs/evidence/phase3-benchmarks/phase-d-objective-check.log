@@ -1,0 +1,17 @@
+PHASE 3 — PHASE D OBJECTIVE EVIDENCE CHECK
+Source: docs/evidence/phase3-benchmarks/phaseD-legacy-vs-seatlabel-50-100-200-300.log
+(benchmark_phase_d.py, policy DEPARTMENT_ONLY).
+
+Per size: legacyStatus=OPTIMAL, newStatus=OPTIMAL, newValid=true,
+newPassesValidator=true, newObjective=0, sameDepartmentAdjacent=0,
+policyViolations=0, all candidates assigned, equivalence=true.
+
+size=50  legacy obj 0 / new obj 0, assigned 50, validator pass
+size=100 legacy obj 0 / new obj 0, assigned 100, validator pass
+size=200 legacy obj 0 / new obj 0, assigned 200, validator pass
+size=300 legacy obj 0 / new obj 0, assigned 300, validator pass
+
+ALL_EQUIVALENCE_PASS=True, PHASE D = PASS.
+Legacy vs new objective equivalence confirmed for 50/100/200/300.
+OPTIMAL objective reporting path = int(round(solver.ObjectiveValue())); reported
+objective equals validator sameDepartmentAdjacentCount for every size (0 == 0).

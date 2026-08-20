@@ -5,6 +5,8 @@ import type {
   ClassItem,
   Department,
   Exam,
+  ExamCandidatePage,
+  ExamConflictReport,
   GenerationCreated,
   GenerationStatus,
   Gender,
@@ -142,6 +144,87 @@ export async function resolveCandidate(
 export async function getExams(): Promise<Exam[]> {
   const res = await request<{ exams: Exam[] }>("/exam-seating/exams");
   return res.exams;
+}
+
+export async function getExamConflicts(examId: string): Promise<ExamConflictReport> {
+  return request<ExamConflictReport>(
+    `/exam-seating/exams/${encodeURIComponent(examId)}/conflicts`,
+  );
+}
+
+export async function getExamCandidates(
+  examId: string,
+  limit: number,
+  offset: number,
+): Promise<ExamCandidatePage> {
+  const query = `limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`;
+  return request<ExamCandidatePage>(
+    `/exam-seating/exams/${encodeURIComponent(examId)}/candidates?${query}`,
+  );
+}
+
+export interface AddExamCandidateInput {
+  studentId: string;
+  reason?: string;
+}
+
+export async function addExamCandidate(
+  examId: string,
+  input: AddExamCandidateInput,
+): Promise<Candidate> {
+  const res = await request<{ candidate: Candidate }>(
+    `/exam-seating/exams/${encodeURIComponent(examId)}/candidates`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
+  return res.candidate;
+}
+
+export async function excludeExamCandidate(
+  examId: string,
+  candidateId: string,
+  reason: string,
+): Promise<Candidate> {
+  const res = await request<{ candidate: Candidate }>(
+    `/exam-seating/exams/${encodeURIComponent(examId)}/candidates/${encodeURIComponent(candidateId)}/exclude`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
+    },
+  );
+  return res.candidate;
+}
+
+export async function reinstateExamCandidate(
+  examId: string,
+  candidateId: string,
+  reason?: string,
+): Promise<Candidate> {
+  const res = await request<{ candidate: Candidate }>(
+    `/exam-seating/exams/${encodeURIComponent(examId)}/candidates/${encodeURIComponent(candidateId)}/reinstate`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: reason ?? "" }),
+    },
+  );
+  return res.candidate;
+}
+
+export async function cancelExam(examId: string, reason?: string): Promise<Exam> {
+  const res = await request<{ exam: Exam }>(
+    `/exam-seating/exams/${encodeURIComponent(examId)}/cancel`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: reason ?? "" }),
+    },
+  );
+  return res.exam;
 }
 
 export async function generateSeating(examId: string): Promise<GenerationCreated> {
